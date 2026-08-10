@@ -1,0 +1,288 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>行测备考助手</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部导航 -->
+    <header class="header">
+      <div class="header-row">
+        <h1>📝 行测备考助手</h1>
+        <button id="settingsBtn" class="btn-icon" title="设置">⚙️</button>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="analyze">🔍 题目解析</button>
+        <button class="tab" data-tab="review">📋 错题本</button>
+        <button class="tab" data-tab="stats">📊 统计看板</button>
+      </nav>
+    </header>
+
+    <!-- 设置弹窗 -->
+    <div id="settingsModal" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>⚙️ 设置</h2>
+          <button id="closeSettingsBtn" class="btn-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="apiKeyInput">DeepSeek API Key</label>
+          <div class="input-with-icon">
+            <input type="password" id="apiKeyInput" class="form-input" placeholder="sk-xxxxxxxxxxxxxxxx">
+            <button id="toggleKeyBtn" class="btn-eye">👁️</button>
+          </div>
+          <small class="form-hint">从 <a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek 控制台</a> 获取。Key 仅保存在浏览器本地。</small>
+          <div id="apiKeyStatus" class="api-status"></div>
+          <div class="modal-actions">
+            <button id="saveKeyBtn" class="btn btn-primary" style="width:auto">💾 保存</button>
+            <button id="clearKeyBtn" class="btn btn-small">清除</button>
+          </div>
+          <hr class="divider">
+          <label class="form-label" for="dashscopeKeyInput">DashScope API Key <small>（Qwen-VL看图 + SenseVoice语音）</small></label>
+          <div class="input-with-icon">
+            <input type="password" id="dashscopeKeyInput" class="form-input" placeholder="sk-xxxxxxxxxxxxxxxx">
+            <button id="toggleDashKeyBtn" class="btn-eye">👁️</button>
+          </div>
+          <small class="form-hint">从 <a href="https://bailian.console.aliyun.com" target="_blank">阿里云百炼控制台</a> 获取。一个Key同时用于截图识别和语音转文字。</small>
+          <div id="dashscopeKeyStatus" class="api-status"></div>
+          <div class="modal-actions">
+            <button id="saveDashKeyBtn" class="btn btn-primary" style="width:auto" onclick="window._saveDashKey()">💾 保存</button>
+            <button id="clearDashKeyBtn" class="btn btn-small" onclick="window._clearDashKey()">清除</button>
+          </div>
+          <hr class="divider">
+          <p class="about-text">
+            <strong>行测备考助手 v2.0</strong><br>
+            Qwen-VL OCR + SenseVoice语音 + DeepSeek SOP解析
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 题目解析页面 -->
+      <main id="tab-analyze" class="tab-content active">
+      <div class="analyze-layout">
+        <!-- 左侧：上传 & OCR -->
+        <section class="panel upload-panel">
+          <h2>📷 上传题目截图</h2>
+          <div class="upload-zone" id="uploadZone" tabindex="0">
+            <input type="file" id="imageInput" accept="image/*" hidden>
+            <div class="upload-placeholder">
+              <span class="upload-icon">📤</span>
+              <p>点击上传 或 <kbd>Ctrl+V</kbd> 粘贴截图</p>
+              <small>支持 JPG、PNG、WebP 格式</small>
+            </div>
+            <img id="previewImage" class="preview-image" style="display:none" alt="预览">
+          </div>
+
+          <button id="ocrBtn" class="btn btn-primary" disabled>
+            🔎 开始识别文字
+          </button>
+
+          <div id="ocrProgress" class="ocr-progress" style="display:none">
+            <div class="progress-bar"><div class="progress-fill"></div></div>
+            <p id="ocrStatus">识别中...</p>
+          </div>
+
+          <div id="ocrResult" class="ocr-result" style="display:none">
+            <h3>识别结果（可编辑修正）</h3>
+            <textarea id="ocrText" rows="6" placeholder="OCR识别结果将显示在这里..."></textarea>
+          </div>
+
+          <div id="thoughtSection" class="thought-section" style="display:none">
+            <div class="thought-row">
+              <div class="thought-answer">
+                <h3>🎯 你选的答案 <small>（OCR自动识别，可手动修改）</small> <span id="detectedCorrectAnswer" style="color:#10b981;font-size:0.85rem;"></span></h3>
+                <div class="answer-options">
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="A"> A</label>
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="B"> B</label>
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="C"> C</label>
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="D"> D</label>
+                </div>
+              </div>
+            </div>
+            <h3>🧠 你的思考过程 <small>（帮助AI精准诊断错因）</small></h3>
+            <textarea id="userThought" rows="4" placeholder="写下你当时的做题思路：
+例如：我当时觉得这句是重点，所以选了C...
+或者：这道数量关系题我列出了方程，但解出来没有对应选项...
+或者：我在A和B之间纠结，最后选了A因为..."></textarea>
+            <button class="mic-btn" data-target="userThought" title="语音输入">🎤</button>
+          </div>
+
+          <button id="analyzeBtn" class="btn btn-accent" style="display:none">
+            🤖 DeepSeek 智能解析
+          </button>
+        </section>
+
+        <!-- 右侧：解析结果 -->
+        <section class="panel result-panel" id="resultPanel">
+          <div class="result-placeholder">
+            <span class="result-icon">🤖</span>
+            <p>AI 解析结果将显示在这里</p>
+            <small>上传截图 → Qwen-VL识别 → 填写思考过程 → 智能解析</small>
+          </div>
+
+          <div id="analysisResult" class="analysis-result" style="display:none">
+            <div class="result-header">
+              <span class="module-badge" id="resultModule"></span>
+              <span class="category-badge" id="resultCategory"></span>
+              <span class="difficulty-badge" id="resultDifficulty"></span>
+            </div>
+            <!-- 全要素解析渲染区 -->
+            <div id="resultFullAnalysis" class="solution-text markdown-body"></div>
+
+            <div class="result-section">
+              <h3>📚 知识点</h3>
+              <div id="resultKnowledge" class="knowledge-tags"></div>
+            </div>
+
+            <div class="result-actions">
+              <label class="correct-toggle">
+                <input type="checkbox" id="correctCheck"> 这道题我做对了
+              </label>
+              <button id="screenshotBtn" class="btn btn-capture">📸 截图分享</button>
+              <button id="saveBtn" class="btn btn-success">💾 保存到错题本</button>
+            </div>
+
+            <!-- 接续对话面板 -->
+            <div class="chat-panel" id="chatPanel">
+              <div class="chat-header" id="chatToggle">
+                <h3>💬 追问 & 复盘</h3>
+                <span class="chat-toggle-icon">▼</span>
+              </div>
+              <div class="chat-body" id="chatBody">
+                <div class="chat-messages" id="chatMessages">
+                  <div class="chat-hint">
+                    💡 可以追问："<strong>B选项为什么错</strong>？"、"<strong>这道题的陷阱在哪里</strong>？"<br>
+                    也可以输入你的解题思路："<strong>我当时的想法是…</strong>"
+                  </div>
+                </div>
+                <div class="chat-input-row">
+                  <button class="mic-btn mic-btn-sm" data-target="chatInput" title="语音输入">🎤</button>
+                  <textarea id="chatInput" rows="2" placeholder="输入你的问题或思路…" class="chat-textarea"></textarea>
+                  <button id="chatSendBtn" class="btn btn-primary" style="width:auto;margin:0">发送</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    
+    <!-- 错题本页面 -->
+    <main id="tab-review" class="tab-content">
+      <div class="review-toolbar">
+        <div class="filter-group">
+          <select id="filterCategory">
+            <option value="all">全部类型</option>
+            <option value="政治理论">政治理论</option>
+            <option value="常识判断">常识判断</option>
+            <option value="言语理解">言语理解</option>
+            <option value="数量关系">数量关系</option>
+            <option value="判断推理">判断推理</option>
+            <option value="资料分析">资料分析</option>
+          </select>
+          <select id="filterDifficulty">
+            <option value="all">全部难度</option>
+            <option value="简单">简单</option>
+            <option value="中等">中等</option>
+            <option value="困难">困难</option>
+          </select>
+          <select id="filterCorrect">
+            <option value="all">全部对错</option>
+            <option value="correct">做对了</option>
+            <option value="wrong">做错了</option>
+          </select>
+          <input type="date" id="filterDateStart" title="开始日期">
+          <span>至</span>
+          <input type="date" id="filterDateEnd" title="结束日期">
+        </div>
+        <div class="action-group">
+          <button id="exportJSONBtn" class="btn btn-small">📄 导出 JSON</button>
+          <button id="exportCSVBtn" class="btn btn-small">📊 导出 CSV</button>
+          <button id="exportPDFBtn" class="btn btn-small">🖨️ 导出 PDF</button>
+        </div>
+      </div>
+
+      <div id="reviewList" class="review-list">
+        <div class="empty-state">
+          <span>📭</span>
+          <p>还没有保存的题目记录</p>
+          <small>去「题目解析」上传并保存题目吧</small>
+        </div>
+      </div>
+    </main>
+
+    <!-- 统计看板页面 -->
+    <main id="tab-stats" class="tab-content">
+      <div class="stats-grid">
+        <div class="stats-card">
+          <h3>总题量</h3>
+          <p class="stats-number" id="statTotal">0</p>
+        </div>
+        <div class="stats-card correct">
+          <h3>正确率</h3>
+          <p class="stats-number" id="statAccuracy">0%</p>
+        </div>
+        <div class="stats-card">
+          <h3>薄弱模块</h3>
+          <p class="stats-number" id="statWeakness">-</p>
+        </div>
+        <div class="stats-card">
+          <h3>近期趋势</h3>
+          <p class="stats-number" id="statTrend">-</p>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-container">
+          <h3>各模块题目分布</h3>
+          <canvas id="chartCategory"></canvas>
+        </div>
+        <div class="chart-container">
+          <h3>各模块正确率</h3>
+          <canvas id="chartAccuracy"></canvas>
+        </div>
+        <div class="chart-container">
+          <h3>难度分布</h3>
+          <canvas id="chartDifficulty"></canvas>
+        </div>
+        <div class="chart-container">
+          <h3>近期做题趋势</h3>
+          <canvas id="chartTrend"></canvas>
+        </div>
+      </div>
+
+      <div class="weakness-panel" id="weaknessPanel">
+        <h3>📉 薄弱知识点分析</h3>
+        <div id="weaknessContent">
+          <p class="empty-state">暂无数据</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Toast 提示 -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="/js/prompts.js"></script>
+  <script src="/js/deepseek.js"></script>
+  <script src="/js/storage.js"></script>
+  <script src="/js/ocr.js"></script>
+  <script src="/js/stats.js"></script>
+  <script src="/js/export.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
+
