@@ -176,6 +176,7 @@ ocrBtn.addEventListener('click', function(){
       if (qCorrect && ca) ca.textContent = '\uFF08\u8BC6\u522B\u6B63\u786E\u7B54\u6848\uFF1A' + qCorrect + '\uFF09';
       if (qUser) { document.querySelectorAll('input[name="userAnswer"]').forEach(function(r){ if(r.value===qUser)r.checked=true; }); }
       thoughtSection.style.display = 'block'; analyzeBtn.style.display = 'block'; ocrBtn.disabled = false;
+      if (ocrText.value) { window._autoAnalyze = true; analyzeBtn.click(); }
       showToast(ocrText.value ? 'Qwen-VL \u8BC6\u522B\u5B8C\u6210' : '\u672A\u8BC6\u522B\u5230\u6587\u5B57', ocrText.value?'success':'error');
     },300);
   }).catch(function(err){

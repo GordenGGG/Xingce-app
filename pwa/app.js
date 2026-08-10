@@ -78,7 +78,7 @@ ob.addEventListener('click',function(){
     setTimeout(function(){op.style.display='none';ore.style.display='block';ot.value=d.question||'';
       var ca=document.getElementById('detectedCorrectAnswer');if(d.correctAnswer&&ca)ca.textContent='(正确答案:'+d.correctAnswer+')';
       if(d.userAnswer)document.querySelectorAll('input[name="userAnswer"]').forEach(function(r){if(r.value===d.userAnswer)r.checked=true});
-      ts.style.display='block';ab.style.display='block';ob.disabled=false;toast(ot.value?'识别完成':'未识别到文字',ot.value?'success':'error')},300)
+      ts.style.display='block';ab.style.display='block';if(ot.value)ab.click();ob.disabled=false;toast(ot.value?'识别完成':'未识别到文字',ot.value?'success':'error')},300)
   }).catch(function(e){op.style.display='none';ob.disabled=false;toast(e.message,'error')})
 });
 
