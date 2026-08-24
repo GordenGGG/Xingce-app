@@ -533,6 +533,7 @@ function renderReviewList(){
         +'<div class="review-card-body"><div class="review-question">'+escapeHtml(r.question||'')+'</div></div>'
         +'<div class="review-card-actions">'
         +'<button class="btn btn-small" onclick="viewReviewCard('+r.id+')">\u{1F50D} \u67E5\u770B</button>'
+        +'<button class="btn btn-small" onclick="startReviewMode('+r.id+')">\u{1F504} \u91CD\u7EC3</button>'
         +(r.mastered?'':'<button class="btn btn-small" onclick="markMastered('+r.id+')">\u2705 \u638C\u63E1</button>')
         +'<button class="btn btn-small btn-danger" onclick="deleteReviewCard('+r.id+')">\u{1F5D1} \u5220\u9664</button>'
         +'</div></div>'
@@ -560,6 +561,63 @@ window.gotoPage=function(pg){
 window.markMastered=function(id){
   storage.update(id,{mastered:true,masteredAt:new Date().toISOString()}).then(function(){renderReviewList();showToast('\u5DF2\u6807\u8BB0\u638C\u63E1','success')});
 };
+
+// ===== 重练模式（隐藏答案自测，提交判定） =====
+var reviewModeId=null, reviewModeRecord=null;
+window.startReviewMode=function(id){
+  storage.getById(id).then(function(r){
+    if(!r)return;
+    reviewModeId=id; reviewModeRecord=r;
+    // 切到解析 tab
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
+    document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+    var tt=document.querySelector('.tab[data-tab="analyze"]');if(tt)tt.classList.add('active');
+    document.getElementById('tab-analyze').classList.add('active');
+    // 回填题目（不渲染解析，避免泄题）
+    ocrText.value=r.question||''; currentImageData=r.imageData||'';
+    if(r.imageData){previewImage.src=r.imageData;previewImage.style.display='block';uploadPlaceholder.style.display='none';ocrBtn.disabled=false}
+    // 清空答案选择
+    document.querySelectorAll('input[name="userAnswer"]').forEach(function(rb){rb.checked=false});
+    document.querySelectorAll('input[name="correctAnswer"]').forEach(function(rb){rb.checked=(rb.value==='')});
+    var dca=document.getElementById('detectedCorrectAnswer'); if(dca)dca.textContent='';
+    userThoughtInput.value='';
+    document.getElementById('correctCheck').checked=false;
+    thoughtSection.style.display='block';
+    document.getElementById('analyzeBtn').style.display='none';
+    document.getElementById('submitReviewBtn').style.display='block';
+    lastAnalysisData=null; currentRecordId=null;
+    analysisResult.style.display='none'; resultPlaceholder.style.display='block';
+    showToast('\u91CD\u7EC3\u6A21\u5F0F\uFF1A\u9009\u62E9\u4F60\u7684\u7B54\u6848\u540E\u70B9\u51FB\u201C\u63D0\u4EA4\u91CD\u7EC3\u5224\u5B9A\u201D','success');
+  });
+};
+document.getElementById('submitReviewBtn').addEventListener('click',function(){
+  if(!reviewModeRecord){showToast('\u6CA1\u6709\u6B63\u5728\u91CD\u7EC3\u7684\u9898\u76EE','error');return;}
+  var ur=document.querySelector('input[name="userAnswer"]:checked');
+  if(!ur||!ur.value){showToast('\u8BF7\u5148\u9009\u62E9\u7B54\u6848','error');return;}
+  var chosen=ur.value;
+  var correct=(reviewModeRecord.answer||'').toUpperCase();
+  var isRight=chosen===correct;
+  var upd={
+    userAnswer:chosen,
+    isCorrect:isRight,
+    reviewCount:(reviewModeRecord.reviewCount||0)+1,
+    lastReviewedAt:new Date().toISOString()
+  };
+  if(isRight)upd.mastered=true; // 重练答对自动标记掌握
+  storage.update(reviewModeId,upd).then(function(){
+    showToast(isRight?'\u2705 \u91CD\u7EC3\u6B63\u786E\uFF01\u5DF2\u6807\u8BB0\u638C\u63E1':'\u274C \u91CD\u7EC3\u9519\u8BEF\uFF0C\u6B63\u786E\u7B54\u6848\u662F '+correct,'success');
+    document.getElementById('submitReviewBtn').style.display='none';
+    document.getElementById('analyzeBtn').style.display='block';
+    // 展示原解析便于对照
+    lastAnalysisData={module:reviewModeRecord.category||'',rawMarkdown:reviewModeRecord.rawMarkdown||reviewModeRecord.solution||'',knowledgePoints:reviewModeRecord.knowledgePoints||[],tips:reviewModeRecord.tips||'',difficulty:reviewModeRecord.difficulty||''};
+    currentRecordId=reviewModeId;
+    renderFullAnalysis(lastAnalysisData);
+    resultPlaceholder.style.display='none';analysisResult.style.display='block';
+    document.querySelectorAll('input[name="correctAnswer"]').forEach(function(rb){if(rb.value===correct)rb.checked=true});
+    reviewModeId=null; reviewModeRecord=null;
+    renderReviewList();
+  }).catch(function(){showToast('\u64CD\u4F5C\u5931\u8D25','error')});
+});
 window.viewReviewCard=function(id){
   storage.getById(id).then(function(r){
     if(!r)return;
