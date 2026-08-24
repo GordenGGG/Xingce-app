@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
@@ -145,33 +145,28 @@ app.post("/api/analyze", async (req, res) => {
   // 深度解析
   try {
     let prompt = modulePrompts[module];
-    prompt = prompt.replace("{{text}}", text);
-    // 注入考生的思考过程（如果没有则填"考生未提供思考过程"）
+    prompt = prompt.replace("{{text}}", text.trim());
+
+    // 注入考生思考过程（缺省提示，引导模型按通用模式分析错因）
     const thought = userThought && userThought.trim()
       ? userThought.trim()
       : "（考生未提供思考过程——请按通用模式分析可能的错因）";
     prompt = prompt.replace("{{userThought}}", thought);
 
-    // 注入考生的答案
-    let answer = userAnswer && userAnswer.trim()
+    // 注入考生答案（缺省提示）
+    const answer = userAnswer && userAnswer.trim()
       ? userAnswer.trim()
       : "（未提供）";
     prompt = prompt.replace("{{userAnswer}}", answer);
 
-    // 如果OCR检测到了正确答案，补充进prompt
+    // 注入 OCR/正则识别到的正确答案；未识别时填缺省值，避免占位符原样发送给模型
+    const correct = detectedCorrect && detectedCorrect.trim()
+      ? detectedCorrect.trim()
+      : "（未识别）";
+    prompt = prompt.replace("{{correctAnswer}}", correct);
     if (detectedCorrect && detectedCorrect.trim()) {
-      // 注入识别到的正确答案和用户答案
-    if (detectedCorrect && detectedCorrect.trim()) {
-      prompt = prompt.replace(/\*\*正确答案\*\*[：:]\s*[A-DX]?/g, "**正确答案**：" + detectedCorrect.trim());
-      prompt = prompt.replace("{{correctAnswer}}", detectedCorrect.trim());
-    }
-    if (userAnswer && userAnswer.trim()) {
-      prompt = prompt.replace("{{userAnswer}}", userAnswer.trim());
-    } else {
-      prompt = prompt.replace("{{userAnswer}}", "（未提供）");
-    }
-    const thought = userThought && userThought.trim() ? userThought.trim() : "（考生未提供思考过程——请按通用模式分析可能的错因）";
-    prompt = prompt.replace("{{userThought}}", thought);
+      // 同步把"题目原文"板块的示例标注（**正确答案**：X）替换为真实答案
+      prompt = prompt.replace(/\*\*正确答案\*\*[：:]\s*[A-DX]?/g, "**正确答案**：" + correct);
     }
 
     const rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4);
