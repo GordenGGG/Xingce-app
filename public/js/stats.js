@@ -1,4 +1,4 @@
-﻿// ===== 统计图表模块 =====
+// ===== 统计图表模块 =====
 class StatsRenderer {
   constructor() {
     this.charts = {};
@@ -34,7 +34,7 @@ class StatsRenderer {
         labels,
         datasets: [{
           data,
-          backgroundColor: ["#818cf8", "#34d399", "#fbbf24", "#f472b6", "#38bdf8"],
+          backgroundColor: ["#818cf8", "#34d399", "#fbbf24", "#f472b6", "#38bdf8", "#f97316"],
           borderWidth: 2,
           borderColor: "#fff",
         }],

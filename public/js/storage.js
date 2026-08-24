@@ -91,6 +91,43 @@ class Storage {
     });
   }
 
+  // 批量删除（错题本多选操作）
+  async deleteMany(ids) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      let done = 0;
+      ids.forEach((id) => {
+        const req = store.delete(id);
+        req.onsuccess = () => { if (++done === ids.length) resolve(); };
+        req.onerror = () => reject(req.error);
+      });
+      if (ids.length === 0) resolve();
+    });
+  }
+
+  // 批量更新（错题本多选操作，如批量标记掌握）
+  async updateMany(ids, changes) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      let done = 0;
+      ids.forEach((id) => {
+        const getReq = store.get(id);
+        getReq.onsuccess = () => {
+          const record = getReq.result;
+          if (!record) { if (++done === ids.length) resolve(); return; }
+          Object.assign(record, changes);
+          const putReq = store.put(record);
+          putReq.onsuccess = () => { if (++done === ids.length) resolve(); };
+          putReq.onerror = () => reject(putReq.error || new Error("更新失败"));
+        };
+        getReq.onerror = () => reject(getReq.error);
+      });
+      if (ids.length === 0) resolve();
+    });
+  }
+
   async getById(id) {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE_NAME, "readonly");
@@ -167,7 +204,7 @@ class Storage {
     let weakest = "-";
     let lowestRate = 100;
     for (const cat of CATEGORIES) {
-      if (byCategory[cat] > 0) {
+      if (byCategory[cat] >= 3) { // 最小样本 3 题，避免单题错误当选"薄弱模块"
         const rate = byCategoryCorrect[cat] / byCategory[cat];
         if (rate < lowestRate) {
           lowestRate = rate;
@@ -197,11 +234,17 @@ class Storage {
       trend = `${recentRate}%`;
     }
 
+    // 近期趋势：按本地日期统计（修 UTC 时区偏移：本地 0-8 点不再计入前一天）
     const dailyData = [];
+    const pad = (n) => String(n).padStart(2, "0");
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now - i * 86400000);
-      const dateStr = d.toISOString().slice(0, 10);
-      const dayItems = all.filter((r) => r.createdAt.startsWith(dateStr));
+      const y = d.getFullYear(), mo = d.getMonth(), da = d.getDate();
+      const dateStr = y + "-" + pad(mo + 1) + "-" + pad(da);
+      const dayItems = all.filter((r) => {
+        const t = new Date(r.createdAt);
+        return t.getFullYear() === y && t.getMonth() === mo && t.getDate() === da;
+      });
       dailyData.push({
         date: dateStr.slice(5),
         total: dayItems.length,

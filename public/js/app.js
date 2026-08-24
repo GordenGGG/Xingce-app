@@ -336,20 +336,37 @@ function renderFullAnalysis(data) {
   kd.innerHTML=(data.knowledgePoints||[]).map(function(k){return'<span class="knowledge-tag">'+escapeHtml(k)+'</span>'}).join('');
   // 快捷追问按钮
   renderQuickAsk(cVal,uVal);
-  document.getElementById('correctCheck').checked=false;
+  // 对错自动判定展示（可手动覆盖）
+  document.getElementById('correctCheck').checked=!!(cVal&&uVal&&cVal===uVal);
 }
 
-// ===== Save =====
-document.getElementById('saveBtn').addEventListener('click',function(){
+// ===== Save（手动保存 + 自动入库共用） =====
+function saveCurrentRecord(auto){
   var raw=lastAnalysisData?(lastAnalysisData.rawMarkdown||''):'';
   var kps=Array.from(document.querySelectorAll('#resultKnowledge .knowledge-tag')).map(function(e){return e.textContent});
   var ur2=document.querySelector('input[name="userAnswer"]:checked');
   var cr2=document.querySelector('input[name="correctAnswer"]:checked');
-  storage.save({
-    question:ocrText.value.trim().substring(0,300),solution:raw,answer:cr2?cr2.value:'',category:document.getElementById('resultCategory').textContent,
-    difficulty:(lastAnalysisData&&lastAnalysisData.difficulty)||'\u4E2D\u7B49',knowledgePoints:kps,tips:(lastAnalysisData&&lastAnalysisData.tips)||'',isCorrect:document.getElementById('correctCheck').checked,
-    imageData:currentImageData||'',rawMarkdown:raw,userAnswer:ur2?ur2.value:'',userThought:userThoughtInput.value.trim(),conversations:[]
-  }).then(function(id){currentRecordId=id;showToast('\u5DF2\u4FDD\u5B58','success')}).catch(function(){showToast('\u4FDD\u5B58\u5931\u8D25')});
+  var uVal=ur2?ur2.value:'', cVal=cr2?cr2.value:'';
+  // 对错自动判定：答案都识别到时自动判断；用户手动勾选"我做对了"可覆盖为正确
+  var autoCorrect=(uVal&&cVal)?(uVal===cVal):false;
+  var isCorrect=document.getElementById('correctCheck').checked||autoCorrect;
+  var record={
+    question:ocrText.value.trim(), // 完整保存，不再截断 300 字
+    solution:raw,answer:cVal,category:document.getElementById('resultCategory').textContent,
+    difficulty:(lastAnalysisData&&lastAnalysisData.difficulty)||'\u4E2D\u7B49',knowledgePoints:kps,
+    tips:(lastAnalysisData&&lastAnalysisData.tips)||'',isCorrect:isCorrect,
+    imageData:currentImageData||'',rawMarkdown:raw,userAnswer:uVal,
+    userThought:userThoughtInput.value.trim(),conversations:[]
+  };
+  if(currentRecordId){
+    // 已有记录：覆盖更新（update 合并，不动已存的 conversations/mastered 等字段）
+    var upd={};for(var k in record){if(k!=='conversations')upd[k]=record[k];}
+    return storage.update(currentRecordId, upd).then(function(){return currentRecordId;});
+  }
+  return storage.save(record).then(function(id){currentRecordId=id;return id;});
+}
+document.getElementById('saveBtn').addEventListener('click',function(){
+  saveCurrentRecord(false).then(function(){showToast('\u5DF2\u4FDD\u5B58','success')}).catch(function(){showToast('\u4FDD\u5B58\u5931\u8D25')});
 });
 
 // ===== Voice (MediaRecorder + SenseVoice) =====
@@ -460,6 +477,10 @@ chatSendBtn.addEventListener('click',sendChat);
 chatInput.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}});
 
 // ===== Review =====
+// 筛选条件变化即刷新列表（修复筛选器不生效）
+['filterCategory','filterDifficulty','filterCorrect','filterDateStart','filterDateEnd'].forEach(function(id){
+  var el=document.getElementById(id); if(el) el.addEventListener('change', renderReviewList);
+});
 function renderReviewList(){
   var f={category:document.getElementById('filterCategory').value,difficulty:document.getElementById('filterDifficulty').value,isCorrect:document.getElementById('filterCorrect').value,dateStart:document.getElementById('filterDateStart').value,dateEnd:document.getElementById('filterDateEnd').value};
   storage.getAll(f).then(function(data){
