@@ -147,6 +147,7 @@ function handleImageFile(file) {
     ocrBtn.disabled = false; ocrResult.style.display = 'none'; thoughtSection.style.display = 'none';
     analyzeBtn.style.display = 'none'; analysisResult.style.display = 'none'; resultPlaceholder.style.display = 'block';
     var dca = document.getElementById('detectedCorrectAnswer'); if (dca) dca.textContent = '';
+    document.querySelectorAll('input[name="correctAnswer"]').forEach(function(r){r.checked=(r.value==='')});
     resetChat();
   };
   r.readAsDataURL(file);
@@ -171,9 +172,18 @@ ocrBtn.addEventListener('click', function(){
       ocrText.value = normalizeQuestionText(data.question || '');
       var qCorrect = data.correctAnswer || '';
       var qUser = data.userAnswer || '';
-      if (!qCorrect || !qUser) { var fb = parseAnswersFromText(ocrText.value); if (!qCorrect && fb.correct) qCorrect = fb.correct; if (!qUser && fb.user) qUser = fb.user; }
+      // 第二层：前端正则分析（用于兜底 + 交叉校验）
+      var fb = parseAnswersFromText(ocrText.value);
+      if (!qCorrect && fb.correct) qCorrect = fb.correct;
+      if (!qUser && fb.user) qUser = fb.user;
       var ca = document.getElementById('detectedCorrectAnswer');
       if (qCorrect && ca) ca.textContent = '\uFF08\u8BC6\u522B\u6B63\u786E\u7B54\u6848\uFF1A' + qCorrect + '\uFF09';
+      // 交叉校验：视觉识别与文本正则结果不一致时，提醒用户确认，避免错误答案直接注入解析
+      if (qCorrect && fb.correct && qCorrect !== fb.correct) {
+        showToast('\u26A0\uFE0F \u7B54\u6848\u4E0D\u4E00\u81F4\uFF1A\u89C6\u89C9\u8BC6\u522B ' + qCorrect + '\uFF0C\u6587\u672C\u5206\u6790 ' + fb.correct + '\uFF0C\u8BF7\u624B\u52A8\u786E\u8BA4', 'error');
+      }
+      // 勾选正确答案 radio（用户可手动修正）
+      if (qCorrect) { document.querySelectorAll('input[name="correctAnswer"]').forEach(function(r){ if(r.value===qCorrect)r.checked=true; }); }
       if (qUser) { document.querySelectorAll('input[name="userAnswer"]').forEach(function(r){ if(r.value===qUser)r.checked=true; }); }
       thoughtSection.style.display = 'block'; analyzeBtn.style.display = 'block'; ocrBtn.disabled = false;
       if (ocrText.value) { window._autoAnalyze = true; analyzeBtn.click(); }
@@ -245,6 +255,9 @@ analyzeBtn.addEventListener('click', function(){
   var userAnswer=ur?ur.value:'';
   var dcEl=document.getElementById('detectedCorrectAnswer');
   var detectedCorrect=dcEl?(dcEl.textContent.match(/[A-D]/)||[''])[0]:'';
+  // 优先使用"正确答案"单选钮（用户可手动修正），其次绿色标签，最后正则兜底
+  var cr=document.querySelector('input[name="correctAnswer"]:checked');
+  if(cr&&cr.value)detectedCorrect=cr.value;
   // 如果Qwen-VL没识别到答案,用正则兜底
   if(!detectedCorrect){var fb=parseAnswersFromText(text);if(fb.correct)detectedCorrect=fb.correct;if(!userAnswer&&fb.user){userAnswer=fb.user;document.querySelectorAll('input[name="userAnswer"]').forEach(function(r){if(r.value===fb.user)r.checked=true;});}}
 
@@ -291,8 +304,9 @@ document.getElementById('saveBtn').addEventListener('click',function(){
   var raw=lastAnalysisData?(lastAnalysisData.rawMarkdown||''):'';
   var kps=Array.from(document.querySelectorAll('#resultKnowledge .knowledge-tag')).map(function(e){return e.textContent});
   var ur2=document.querySelector('input[name="userAnswer"]:checked');
+  var cr2=document.querySelector('input[name="correctAnswer"]:checked');
   storage.save({
-    question:ocrText.value.trim().substring(0,300),solution:raw,answer:'',category:document.getElementById('resultCategory').textContent,
+    question:ocrText.value.trim().substring(0,300),solution:raw,answer:cr2?cr2.value:'',category:document.getElementById('resultCategory').textContent,
     difficulty:'\u4E2D\u7B49',knowledgePoints:kps,tips:'',isCorrect:document.getElementById('correctCheck').checked,
     imageData:currentImageData||'',rawMarkdown:raw,userAnswer:ur2?ur2.value:'',userThought:userThoughtInput.value.trim(),conversations:[]
   }).then(function(id){currentRecordId=id;showToast('\u5DF2\u4FDD\u5B58','success')}).catch(function(){showToast('\u4FDD\u5B58\u5931\u8D25')});
@@ -426,6 +440,7 @@ window.viewReviewCard=function(id){
     ocrText.value=r.question||'';currentImageData=r.imageData||'';
     if(r.imageData){previewImage.src=r.imageData;previewImage.style.display='block';uploadPlaceholder.style.display='none';ocrBtn.disabled=false}
     if(r.userAnswer)document.querySelectorAll('input[name="userAnswer"]').forEach(function(rb){if(rb.value===r.userAnswer)rb.checked=true});
+    if(r.answer)document.querySelectorAll('input[name="correctAnswer"]').forEach(function(rb){if(rb.value===r.answer)rb.checked=true});
     userThoughtInput.value=r.userThought||'';
     thoughtSection.style.display='block';analyzeBtn.style.display='block';
     // Render saved analysis

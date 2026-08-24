@@ -101,7 +101,19 @@
           <div id="thoughtSection" class="thought-section" style="display:none">
             <div class="thought-row">
               <div class="thought-answer">
-                <h3>🎯 你选的答案 <small>（OCR自动识别，可手动修改）</small> <span id="detectedCorrectAnswer" style="color:#10b981;font-size:0.85rem;"></span></h3>
+                <h3>✅ 正确答案 <small>（AI自动识别，识别错请手动修正）</small> <span id="detectedCorrectAnswer" style="color:#10b981;font-size:0.85rem;"></span></h3>
+                <div class="answer-options">
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="A"> A</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="B"> B</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="C"> C</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="D"> D</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="" checked> 🤔 未知</label>
+                </div>
+              </div>
+            </div>
+            <div class="thought-row">
+              <div class="thought-answer">
+                <h3>🎯 你选的答案 <small>（OCR自动识别，可手动修改）</small></h3>
                 <div class="answer-options">
                   <label class="answer-opt"><input type="radio" name="userAnswer" value="A"> A</label>
                   <label class="answer-opt"><input type="radio" name="userAnswer" value="B"> B</label>
