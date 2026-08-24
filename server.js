@@ -55,7 +55,7 @@ async function callDeepSeek(apiKey, systemPrompt, userContent, temperature = 0.4
   return data.choices?.[0]?.message?.content || "";
 }
 
-// 解析标准化
+// 解析标准化：优先解析双层输出协议的 JSON 结构头，字段缺失时回退旧正则
 function parseAnalysis(raw, module) {
   const fallback = {
     module,
@@ -64,33 +64,67 @@ function parseAnalysis(raw, module) {
     answer: "",
     knowledgePoints: [],
     tips: "",
+    difficulty: "",
+    answerSuspicious: false,
     rawMarkdown: raw,
   };
 
+  // 第一步：尝试解析 JSON 结构头（<<<JSON_START>>> ... <<<JSON_END>>>）
+  let structured = null;
   try {
-    const questionMatch = raw.match(/###\s*📌\s*题目原文\s*\n([\s\S]*?)(?=###|🔑|$)/);
-    const answerMatch = raw.match(/###\s*✅\s*正确答案\s*\n([\s\S]*?)(?=###|📚|⚠️|$)/);
-    const knowledgeMatch = raw.match(/###\s*📚\s*核心知识点[积学]*\s*\n([\s\S]*?)(?=###|⚠️|$)/);
-    const tipsMatch = raw.match(/###\s*⚠️\s*同类陷阱[预]*\s*\n([\s\S]*?)(?=$)/);
-
-    return {
-      module,
-      question: questionMatch ? questionMatch[1].trim() : "",
-      answer: answerMatch ? answerMatch[1].trim() : "",
-      solution: raw, // 完整 Markdown 作为 solution
-      knowledgePoints: knowledgeMatch
-        ? knowledgeMatch[1]
-            .trim()
-            .split("\n")
-            .filter((l) => l.trim())
-            .map((l) => l.replace(/^[\d.\-•]+\s*/, "").trim())
-        : [],
-      tips: tipsMatch ? tipsMatch[1].trim() : "",
-      rawMarkdown: raw,
-    };
-  } catch {
-    return fallback;
+    const m = raw.match(/<<<JSON_START>>>\s*([\s\S]*?)\s*<<<JSON_END>>>/);
+    if (m) structured = JSON.parse(m[1].trim());
+  } catch (e) {
+    structured = null;
   }
+
+  // 第二步：旧正则回退（JSON 缺失或某字段缺失时使用）
+  const questionMatch = raw.match(/###\s*📌\s*题目原文\s*\n([\s\S]*?)(?=###|🔑|$)/);
+  const answerMatch = raw.match(/###\s*✅\s*正确答案\s*\n([\s\S]*?)(?=###|📚|⚠️|$)/);
+  const knowledgeMatch = raw.match(/###\s*📚\s*核心知识点[积学]*\s*\n([\s\S]*?)(?=###|⚠️|$)/);
+  const tipsMatch = raw.match(/###\s*⚠️\s*同类陷阱[预]*\s*\n([\s\S]*?)(?=$)/);
+  const fallbackKnowledge = knowledgeMatch
+    ? knowledgeMatch[1]
+        .trim()
+        .split("\n")
+        .filter((l) => l.trim())
+        .map((l) => l.replace(/^[\d.\-•]+\s*/, "").trim())
+    : [];
+
+  return {
+    module,
+    question: (structured && structured.question) || (questionMatch ? questionMatch[1].trim() : ""),
+    answer: (structured && structured.answer) || (answerMatch ? answerMatch[1].trim() : ""),
+    solution: raw, // 完整 Markdown 作为 solution
+    knowledgePoints: Array.isArray(structured && structured.knowledgePoints) && structured.knowledgePoints.length
+      ? structured.knowledgePoints
+      : fallbackKnowledge,
+    tips: (structured && structured.trap) || (tipsMatch ? tipsMatch[1].trim() : ""),
+    difficulty: (structured && structured.difficulty) || "",
+    answerSuspicious: !!(structured && structured.answerSuspicious),
+    rawMarkdown: raw,
+  };
+}
+
+// ===== 本地关键词预分类（命中时省去一次 LLM 调用） =====
+function classifyLocally(text) {
+  if (!text) return null;
+  const rules = [
+    { module: "资料分析", kws: ["同比", "环比", "增长率", "增长量", "比重", "倍数", "平均数", "百分点", "现期", "基期", "复合增长率"] },
+    { module: "数量关系", kws: ["方程", "工程问题", "行程", "利润", "排列组合", "概率", "几何", "浓度", "容斥", "最值", "等差数列", "等比数列", "追及", "相遇", "牛吃草"] },
+    { module: "判断推理", kws: ["图形推理", "类比推理", "定义判断", "逻辑判断", "翻译推理", "加强", "削弱", "真假推理", "充分条件", "必要条件", "一笔画", "对称"] },
+    { module: "言语理解", kws: ["选词填空", "成语辨析", "主旨概括", "意图判断", "标题选择", "语句排序", "语句衔接", "实词", "虚词"] },
+    { module: "政治理论", kws: ["二十大", "中全会", "习近平", "新质生产力", "中国特色社会主义", "马克思主义", "党史", "党建", "总体布局", "五位一体"] },
+    { module: "常识判断", kws: ["民法典", "宪法", "行政法", "刑法", "诉讼法", "历史常识", "地理常识", "科技常识", "生物常识", "物理常识", "化学常识"] },
+  ];
+  const hits = {};
+  for (const r of rules) {
+    let cnt = 0;
+    for (const kw of r.kws) if (text.includes(kw)) cnt++;
+    if (cnt > 0) hits[r.module] = cnt;
+  }
+  const best = Object.keys(hits).sort((a, b) => hits[b] - hits[a])[0];
+  return best || null;
 }
 
 // ===== 阶段一：模块分类 =====
@@ -98,6 +132,12 @@ app.post("/api/classify", async (req, res) => {
   const { text } = req.body;
   if (!text || !text.trim()) {
     return res.status(400).json({ error: "题目文本不能为空" });
+  }
+
+  // 本地关键词预分类无需 API Key，命中直接返回（省时省调用）
+  const local = classifyLocally(text);
+  if (local) {
+    return res.json({ module: local, source: "local" });
   }
 
   const apiKey = getApiKey(req);
@@ -111,7 +151,7 @@ app.post("/api/classify", async (req, res) => {
     const module = result.trim();
     const validModules = ["政治理论", "常识判断", "言语理解", "数量关系", "判断推理", "资料分析"];
     const finalModule = validModules.includes(module) ? module : "常识判断";
-    res.json({ module: finalModule });
+    res.json({ module: finalModule, source: "llm" });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || "分类失败" });
   }
@@ -132,13 +172,19 @@ app.post("/api/analyze", async (req, res) => {
   // 确定使用的模块 Prompt
   let module = forceModule;
   if (!module || !modulePrompts[module]) {
-    try {
-      const classPrompt = classifierPrompt.replace("{{text}}", text);
-      const clsResult = await callDeepSeek(apiKey, "你是一个行测题目分类器，只输出模块名称。", classPrompt, 0.1);
-      module = clsResult.trim();
-      if (!modulePrompts[module]) module = "常识判断";
-    } catch {
-      module = "常识判断";
+    // 优先本地关键词预分类，未命中再走 LLM
+    const local = classifyLocally(text);
+    if (local && modulePrompts[local]) {
+      module = local;
+    } else {
+      try {
+        const classPrompt = classifierPrompt.replace("{{text}}", text);
+        const clsResult = await callDeepSeek(apiKey, "你是一个行测题目分类器，只输出模块名称。", classPrompt, 0.1);
+        module = clsResult.trim();
+        if (!modulePrompts[module]) module = "常识判断";
+      } catch {
+        module = "常识判断";
+      }
     }
   }
 
@@ -167,6 +213,15 @@ app.post("/api/analyze", async (req, res) => {
     if (detectedCorrect && detectedCorrect.trim()) {
       // 同步把"题目原文"板块的示例标注（**正确答案**：X）替换为真实答案
       prompt = prompt.replace(/\*\*正确答案\*\*[：:]\s*[A-DX]?/g, "**正确答案**：" + correct);
+    }
+
+    // 差异化解析模式：做对 → 巩固模式；做错/未知 → 错因深挖模式
+    const judgedCorrect = !!(userAnswer && detectedCorrect
+      && userAnswer.trim().toUpperCase() === detectedCorrect.trim().toUpperCase());
+    if (judgedCorrect) {
+      prompt += "\n\n【本题考生做对了】请切换为巩固模式：不要强行编造错因。重点回答：①这道题的核心考点与15秒内快速解题思路；②本题有什么隐蔽陷阱（即便做对也要警惕）；③同类题下次如何提速。";
+    } else {
+      prompt += "\n\n【本题考生做错了或答案未确认】请按错因诊断模式，结合考生思考过程深挖选错原因，直指思维漏洞，并给出纠正后的正确思路。";
     }
 
     const rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4);
