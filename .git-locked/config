@@ -1,0 +1,12 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[user]
+	name = GordenGGG
+	email = gordenggg@users.noreply.github.com
+[lfs]
+	repositoryformatversion = 0

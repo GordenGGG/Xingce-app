@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 02471250a5c0f65af7c4e6620b1bad9f7cae3055 GordenGGG <gordenggg@users.noreply.github.com> 1786381607 +0800	commit (initial): 初始化行测备考助手项目
+02471250a5c0f65af7c4e6620b1bad9f7cae3055 5536c9edbb73e199f07f7ef96ab4d2e8cfefd53a GordenGGG <gordenggg@users.noreply.github.com> 1786382081 +0800	commit: OCR识别成功后自动触发DeepSeek智能解析
+5536c9edbb73e199f07f7ef96ab4d2e8cfefd53a 81bc4cab3649fcea51e203e8aa717b2edfeacd9f GordenGGG <gordenggg@users.noreply.github.com> 1787549185 +0800	commit: v1.1.0: 优化答案识别与题目排版，新增版本显示
+81bc4cab3649fcea51e203e8aa717b2edfeacd9f 24f33a75a4e36eae937299c963149ad50d195b01 GordenGGG <gordenggg@users.noreply.github.com> 1787549409 +0800	commit: docs: 新增项目README与交接文档
+24f33a75a4e36eae937299c963149ad50d195b01 c885ba14f6332d93dbb5e768093c6ab048664c98 GordenGGG <gordenggg@users.noreply.github.com> 1787550903 +0800	commit: chore: 清理前端死代码
+24f33a75a4e36eae937299c963149ad50d195b01 0000000000000000000000000000000000000000 GordenGGG <gordenggg@users.noreply.github.com> 1787550924 +0800
