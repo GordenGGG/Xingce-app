@@ -1,4 +1,4 @@
-﻿// ===== 导出模块（JSON / CSV / PDF） =====
+// ===== 导出模块（JSON / CSV / PDF） =====
 class Exporter {
   async getFilteredData() {
     const filters = {
@@ -55,79 +55,66 @@ class Exporter {
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    const maxWidth = pageWidth - margin * 2;
+    const pageW = doc.internal.pageSize.getWidth();   // 210mm
+    const pageH = doc.internal.pageSize.getHeight();  // 297mm
+    const margin = 10;
+    const imgW = pageW - margin * 2;                  // 190mm
+    const contentW = 720;                             // 内容容器宽 px
+    const maxH = 980;                                 // 每页内容最大高度 px
 
-    // 标题
-    doc.setFontSize(18);
-    doc.text("行测备考错题本", margin, 20);
+    // 隐藏容器（html2canvas 需要元素在 DOM 且可渲染，用视口外定位）
+    const holder = document.createElement("div");
+    holder.style.cssText =
+      "position:absolute;left:-9999px;top:0;width:" + contentW + "px;background:#ffffff;color:#1f2937;" +
+      'font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:14px;line-height:1.8;';
+    document.body.appendChild(holder);
 
-    // 基本信息
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`导出时间: ${new Date().toLocaleString("zh-CN")}  共 ${data.length} 题`, margin, 28);
+    const pageEl = document.createElement("div");
+    pageEl.style.cssText = "width:" + contentW + "px;padding:20px;box-sizing:border-box;background:#fff;";
+    holder.appendChild(pageEl);
 
-    let y = 36;
-    doc.setFontSize(11);
-    doc.setTextColor(0);
+    let pageNum = 0;
+    const addCurrentPage = async () => {
+      if (!pageEl.innerHTML.trim()) return;
+      const canvas = await html2canvas(pageEl, {
+        backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false,
+      });
+      const img = canvas.toDataURL("image/jpeg", 0.92);
+      const imgH = (canvas.height / canvas.width) * imgW; // 保持宽高比
+      if (pageNum > 0) doc.addPage();
+      doc.addImage(img, "JPEG", margin, margin, imgW, Math.min(imgH, pageH - margin * 2));
+      pageNum++;
+      pageEl.innerHTML = "";
+    };
+
+    const blockHtml = (r, i) =>
+      '<div style="margin-bottom:14px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">' +
+      '<div style="font-weight:bold;color:#4f46e5;margin-bottom:4px;">#' + (i + 1) + " [" + escapeHtml(r.category || "") + "] " + escapeHtml(r.difficulty || "") + " " + (r.isCorrect ? "✓正确" : "✗错误") + "</div>" +
+      '<div style="margin-bottom:4px;">' + escapeHtml(r.question || "") + "</div>" +
+      (r.answer ? '<div style="color:#10b981;margin-bottom:4px;">答案：' + escapeHtml(r.answer) + "</div>" : "") +
+      (r.userAnswer ? '<div style="color:#64748b;margin-bottom:4px;">我的答案：' + escapeHtml(r.userAnswer) + "</div>" : "") +
+      ((r.knowledgePoints || []).length ? '<div style="color:#92400e;margin-bottom:4px;">知识点：' + escapeHtml(r.knowledgePoints.join("；")) + "</div>" : "") +
+      '<div style="white-space:pre-wrap;">' + escapeHtml(r.solution || "") + "</div>" +
+      "</div>";
 
     for (let i = 0; i < data.length; i++) {
-      const r = data[i];
-
-      // 检查分页
-      if (y > 260) {
-        doc.addPage();
-        y = 20;
+      const div = document.createElement("div");
+      div.innerHTML = blockHtml(data[i], i);
+      pageEl.appendChild(div);
+      if (pageEl.offsetHeight > maxH) {
+        pageEl.removeChild(div);
+        if (!pageEl.innerHTML.trim()) {
+          // 单块本身超高：单独输出该块（压缩到页面高度）
+          pageEl.appendChild(div);
+          await addCurrentPage();
+        } else {
+          await addCurrentPage();
+          pageEl.appendChild(div);
+        }
       }
-
-      // 分隔线
-      doc.setDrawColor(200);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 6;
-
-      // 题目编号 & 类型
-      doc.setFontSize(11);
-      doc.setTextColor(79, 70, 229);
-      doc.text(`#${i + 1}  [${r.category}]  ${r.difficulty || ""}  ${r.isCorrect ? "✓正确" : "✗错误"}`, margin, y);
-      y += 6;
-
-      // 题目内容
-      doc.setFontSize(10);
-      doc.setTextColor(50);
-      const questionLines = doc.splitTextToSize(r.question || "", maxWidth);
-      for (const line of questionLines) {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.text(line, margin, y);
-        y += 5;
-      }
-      y += 3;
-
-      // 答案
-      doc.setFontSize(10);
-      doc.setTextColor(16, 185, 129);
-      doc.text(`答案: ${r.answer || ""}`, margin, y);
-      y += 5;
-
-      // 知识点
-      if (r.knowledgePoints && r.knowledgePoints.length > 0) {
-        doc.setTextColor(100);
-        doc.text(`知识点: ${r.knowledgePoints.join(", ")}`, margin, y);
-        y += 5;
-      }
-
-      // 解析
-      doc.setTextColor(50);
-      const solutionLines = doc.splitTextToSize(r.solution || "", maxWidth);
-      for (const line of solutionLines) {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.text(line, margin, y);
-        y += 5;
-      }
-
-      y += 6;
     }
-
+    await addCurrentPage();
+    document.body.removeChild(holder);
     doc.save("行测错题本.pdf");
     showToast("PDF 导出成功！", "success");
   }
