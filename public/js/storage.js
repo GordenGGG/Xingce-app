@@ -156,6 +156,10 @@ class Storage {
           const correct = filters.isCorrect === "correct";
           results = results.filter((r) => r.isCorrect === correct);
         }
+        if (filters.mastered && filters.mastered !== "all") {
+          const mastered = filters.mastered === "yes";
+          results = results.filter((r) => !!r.mastered === mastered);
+        }
         if (filters.dateStart) {
           const start = new Date(filters.dateStart).getTime();
           results = results.filter((r) => new Date(r.createdAt).getTime() >= start);

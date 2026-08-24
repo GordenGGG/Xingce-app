@@ -19,6 +19,17 @@ class Exporter {
     });
   }
 
+  // 导出选中项（错题本多选）
+  exportSelected(ids) {
+    this.getFilteredData().then((all) => {
+      const set = new Set(ids.map(String));
+      const data = all.filter((r) => set.has(String(r.id)));
+      const json = JSON.stringify(data, null, 2);
+      this.download(json, "行测错题_selected.json", "application/json");
+      showToast("已导出 " + data.length + " 条", "success");
+    });
+  }
+
   exportCSV() {
     this.getFilteredData().then((data) => {
       const headers = ["编号", "题目", "解析", "答案", "类型", "难度", "知识点", "对错", "日期"];

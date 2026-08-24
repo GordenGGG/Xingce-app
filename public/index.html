@@ -223,6 +223,11 @@
             <option value="correct">做对了</option>
             <option value="wrong">做错了</option>
           </select>
+          <select id="filterMastered">
+            <option value="all">掌握状态</option>
+            <option value="no">未掌握</option>
+            <option value="yes">已掌握</option>
+          </select>
           <input type="date" id="filterDateStart" title="开始日期">
           <span>至</span>
           <input type="date" id="filterDateEnd" title="结束日期">
@@ -232,6 +237,16 @@
           <button id="exportCSVBtn" class="btn btn-small">📊 导出 CSV</button>
           <button id="exportPDFBtn" class="btn btn-small">🖨️ 导出 PDF</button>
         </div>
+      </div>
+
+      <!-- 批量操作栏 -->
+      <div class="batch-bar" id="batchBar">
+        <label class="batch-select-all"><input type="checkbox" id="selectAllCheck"> 全选</label>
+        <span class="batch-count" id="selectedCount">已选 0 项</span>
+        <button id="batchDeleteBtn" class="btn btn-small btn-danger" disabled>🗑 批量删除</button>
+        <button id="batchMasterBtn" class="btn btn-small" disabled>✅ 标记已掌握</button>
+        <button id="batchUnmasterBtn" class="btn btn-small" disabled>↩️ 取消掌握</button>
+        <button id="batchExportBtn" class="btn btn-small" disabled>📤 导出选中</button>
       </div>
 
       <div id="reviewList" class="review-list">

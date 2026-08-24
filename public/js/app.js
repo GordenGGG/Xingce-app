@@ -278,7 +278,18 @@ analyzeBtn.addEventListener('click', function(){
     renderFullAnalysis(data);
     resultPlaceholder.style.display='none';analysisResult.style.display='block';
     resetChat();
-    showToast('\u89E3\u6790\u5B8C\u6210\uFF01'+data.module,'success');
+    // 自动入库：正确答案与我的答案都识别到时自动保存（信息不全时不自动存，由用户介入处理）
+    var urA=document.querySelector('input[name="userAnswer"]:checked');
+    var crA=document.querySelector('input[name="correctAnswer"]:checked');
+    if(urA&&urA.value&&crA&&crA.value){
+      saveCurrentRecord(true).then(function(){
+        showToast('\u89E3\u6790\u5B8C\u6210\uFF01'+data.module+'\uFF08\u5DF2\u81EA\u52A8\u5165\u5E93\uFF09','success');
+      }).catch(function(){
+        showToast('\u89E3\u6790\u5B8C\u6210\uFF01'+data.module,'success');
+      });
+    } else {
+      showToast('\u89E3\u6790\u5B8C\u6210\uFF01'+data.module,'success');
+    }
   })
   .catch(function(err){
     resultPlaceholder.innerHTML='<span class="result-icon">\u274C</span><p>'+err.message+'</p>';
@@ -477,18 +488,53 @@ chatSendBtn.addEventListener('click',sendChat);
 chatInput.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}});
 
 // ===== Review =====
+// 多选状态
+var reviewSelected={};
+function getSelectedIds(){return Object.keys(reviewSelected).filter(function(k){return reviewSelected[k];});}
+function clearSelection(){
+  reviewSelected={};
+  var sa=document.getElementById('selectAllCheck'); if(sa)sa.checked=false;
+  updateBatchBar();
+}
+function updateBatchBar(){
+  var n=getSelectedIds().length;
+  var c=document.getElementById('selectedCount'); if(c)c.textContent='\u5DF2\u9009 '+n+' \u9879';
+  ['batchDeleteBtn','batchMasterBtn','batchUnmasterBtn','batchExportBtn'].forEach(function(id){
+    var b=document.getElementById(id); if(b)b.disabled=(n===0);
+  });
+}
 // 筛选条件变化即刷新列表（修复筛选器不生效）
-['filterCategory','filterDifficulty','filterCorrect','filterDateStart','filterDateEnd'].forEach(function(id){
-  var el=document.getElementById(id); if(el) el.addEventListener('change', renderReviewList);
+['filterCategory','filterDifficulty','filterCorrect','filterMastered','filterDateStart','filterDateEnd'].forEach(function(id){
+  var el=document.getElementById(id); if(el) el.addEventListener('change', function(){clearSelection();renderReviewList();});
 });
 function renderReviewList(){
-  var f={category:document.getElementById('filterCategory').value,difficulty:document.getElementById('filterDifficulty').value,isCorrect:document.getElementById('filterCorrect').value,dateStart:document.getElementById('filterDateStart').value,dateEnd:document.getElementById('filterDateEnd').value};
+  var f={category:document.getElementById('filterCategory').value,difficulty:document.getElementById('filterDifficulty').value,isCorrect:document.getElementById('filterCorrect').value,mastered:document.getElementById('filterMastered').value,dateStart:document.getElementById('filterDateStart').value,dateEnd:document.getElementById('filterDateEnd').value};
   storage.getAll(f).then(function(data){
     var c=document.getElementById('reviewList');
     if(!data||data.length===0){c.innerHTML='<div class="empty-state"><span>\u{1F4ED}</span><p>\u8FD8\u6CA1\u6709\u4FDD\u5B58\u7684\u9898\u76EE\u8BB0\u5F55</p></div>';return}
-    c.innerHTML=data.map(function(r,i){return'<div class="review-card" data-id="'+r.id+'"><div class="review-card-header"><span class="review-category">'+escapeHtml(r.category||'')+'</span><span class="review-difficulty '+escapeHtml(r.difficulty||'')+'">'+escapeHtml(r.difficulty||'')+'</span><span class="review-correct '+(r.isCorrect?'correct':'wrong')+'">'+(r.isCorrect?'\u2705 \u505A\u5BF9\u4E86':'\u274C \u505A\u9519\u4E86')+'</span><span class="review-date">'+new Date(r.createdAt).toLocaleDateString('zh-CN')+'</span></div><div class="review-card-body"><div class="review-question">'+escapeHtml(r.question||'')+'</div></div><div class="review-card-actions"><button class="btn btn-small" onclick="viewReviewCard('+r.id+')">\u{1F50D} \u67E5\u770B</button><button class="btn btn-small btn-danger" onclick="deleteReviewCard('+r.id+')">\u{1F5D1} \u5220\u9664</button></div></div>'}).join('')
+    c.innerHTML=data.map(function(r,i){
+      var sel=!!reviewSelected[r.id];
+      return'<div class="review-card'+(r.mastered?' mastered':'')+(sel?' selected':'')+'" data-id="'+r.id+'">'
+        +'<div class="review-card-header">'
+        +'<label class="review-checkbox" title="\u9009\u62E9"><input type="checkbox" class="review-check" data-id="'+r.id+'"'+(sel?' checked':'')+'></label>'
+        +'<span class="review-category">'+escapeHtml(r.category||'')+'</span>'
+        +'<span class="review-difficulty '+escapeHtml(r.difficulty||'')+'">'+escapeHtml(r.difficulty||'')+'</span>'
+        +'<span class="review-correct '+(r.isCorrect?'correct':'wrong')+'">'+(r.isCorrect?'\u2705 \u505A\u5BF9\u4E86':'\u274C \u505A\u9519\u4E86')+'</span>'
+        +(r.mastered?'<span class="review-mastered">\u2705 \u5DF2\u638C\u63E1</span>':'')
+        +'<span class="review-date">'+new Date(r.createdAt).toLocaleDateString('zh-CN')+'</span>'
+        +'</div>'
+        +'<div class="review-card-body"><div class="review-question">'+escapeHtml(r.question||'')+'</div></div>'
+        +'<div class="review-card-actions">'
+        +'<button class="btn btn-small" onclick="viewReviewCard('+r.id+')">\u{1F50D} \u67E5\u770B</button>'
+        +(r.mastered?'':'<button class="btn btn-small" onclick="markMastered('+r.id+')">\u2705 \u638C\u63E1</button>')
+        +'<button class="btn btn-small btn-danger" onclick="deleteReviewCard('+r.id+')">\u{1F5D1} \u5220\u9664</button>'
+        +'</div></div>'
+    }).join('');
   });
 }
+window.markMastered=function(id){
+  storage.update(id,{mastered:true,masteredAt:new Date().toISOString()}).then(function(){renderReviewList();showToast('\u5DF2\u6807\u8BB0\u638C\u63E1','success')});
+};
 window.viewReviewCard=function(id){
   storage.getById(id).then(function(r){
     if(!r)return;
@@ -519,6 +565,41 @@ window.deleteReviewCard=function(id){
   if(!confirm('\u786E\u5B9A\u5220\u9664\uFF1F'))return;
   storage.delete(id).then(function(){renderReviewList();showToast('\u5DF2\u5220\u9664')});
 };
+
+// ===== 批量操作 =====
+document.getElementById('reviewList').addEventListener('change',function(e){
+  var t=e.target;
+  if(t.classList.contains('review-check')){
+    var id=t.dataset.id;
+    reviewSelected[id]=!!t.checked;
+    var card=t.closest('.review-card'); if(card)card.classList.toggle('selected',t.checked);
+    updateBatchBar();
+  }
+});
+document.getElementById('selectAllCheck').addEventListener('change',function(){
+  var on=this.checked;
+  document.querySelectorAll('.review-check').forEach(function(cb){
+    cb.checked=on; reviewSelected[cb.dataset.id]=on;
+    var card=cb.closest('.review-card'); if(card)card.classList.toggle('selected',on);
+  });
+  updateBatchBar();
+});
+document.getElementById('batchDeleteBtn').addEventListener('click',function(){
+  var ids=getSelectedIds(); if(ids.length===0)return;
+  if(!confirm('\u786E\u5B9A\u5220\u9664\u9009\u4E2D\u7684 '+ids.length+' \u6761\u8BB0\u5F55\uFF1F'))return;
+  storage.deleteMany(ids.map(Number)).then(function(){clearSelection();renderReviewList();showToast('\u5DF2\u5220\u9664 '+ids.length+' \u6761','success');}).catch(function(){showToast('\u5220\u9664\u5931\u8D25','error')});
+});
+function batchSetMastered(v){
+  var ids=getSelectedIds(); if(ids.length===0)return;
+  var changes={mastered:v, masteredAt:v?new Date().toISOString():null};
+  storage.updateMany(ids.map(Number),changes).then(function(){clearSelection();renderReviewList();showToast(v?'\u5DF2\u6807\u8BB0\u638C\u63E1':'\u5DF2\u53D6\u6D88\u638C\u63E1','success');}).catch(function(){showToast('\u64CD\u4F5C\u5931\u8D25','error')});
+}
+document.getElementById('batchMasterBtn').addEventListener('click',function(){batchSetMastered(true)});
+document.getElementById('batchUnmasterBtn').addEventListener('click',function(){batchSetMastered(false)});
+document.getElementById('batchExportBtn').addEventListener('click',function(){
+  var ids=getSelectedIds(); if(ids.length===0)return;
+  if(typeof exporter!=='undefined')exporter.exportSelected(ids.map(Number));
+});
 
 // ===== Export =====
 document.getElementById('exportJSONBtn').addEventListener('click',function(){if(typeof exporter!=='undefined')exporter.exportJSON()});
