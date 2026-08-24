@@ -4,9 +4,9 @@
 
 ## 一、当前状态摘要
 
-- **版本**：v1.1.0（SemVer）
+- **版本**：v2.0.0（SemVer）
 - **Git 分支**：master（无远程，纯本地）
-- **提交历史**：3 次（初始化 → OCR 自动解析 → v1.1.0）
+- **提交历史**：本地 master 分支（含初始化 → OCR 自动解析 → v1.1.0 → v2.0.0 清理与修复）
 - **运行状态**：本地版 http://localhost:3000 可用；PWA 线上版 https://gordenggg.github.io/Xingce-app/ 已部署
 - **项目所有者**：GordenGGG
 
@@ -110,23 +110,27 @@
 
 ## 五、遗留问题与废弃代码
 
-### 5.1 废弃但未删除的前端模块
+### 5.1 前端模块说明（v2.0.0 已清理）
 
-`public/js/` 下以下文件是历史遗留，`app.js` 已不引用，属于死代码：
-- `prompts.js`（定义 `PROMPTS` 对象，未使用）
-- `deepseek.js`（定义 `callDeepSeek`，未使用）
+`public/js/` 当前保留 4 个文件，均为活跃依赖：
+- `app.js`：主逻辑（自包含单体）
+- `storage.js`：IndexedDB 存储（`storage` 单例，app.js 的错题本/统计依赖它）
+- `stats.js`：统计图表（`statsRenderer` 单例，app.js 的统计看板依赖它）
+- `export.js`：JSON/CSV/PDF 导出（`exporter` 单例，app.js 的导出按钮依赖它）
+
+> ⚠️ 注意：`storage.js`/`stats.js`/`export.js` 不是死代码，删除会导致错题本、统计、导出功能崩溃。
+
+v2.0.0 已删除的历史遗留（含 `index.html` 对应 `<script>` 引用与 tesseract.js CDN）：
+- `prompts.js`（定义 `PROMPTS`，含 `module.exports` 浏览器语法错误，无人引用）
+- `deepseek.js`（定义前端直连 `callDeepSeek`，被后端代理取代，无人引用）
 - `ocr.js`（Tesseract OCR，已被 Qwen-VL 取代）
-- `export.js`（`Exporter` 类，未使用）
-- `stats.js`（`StatsRenderer` 类，未使用）
-- `storage.js`（IndexedDB 存储，未使用）
-
-这些文件仍被 `index.html` 的 `<script>` 标签加载，但 `app.js` 是自包含单体，不依赖它们。**清理建议**：确认无误后可删除这些文件和对应的 `<script>` 引用。
+- `css/thought_section.css`（仅注释占位，无人引用）
 
 ### 5.2 已知问题
 
 - OCR 识别分数（`a/b`）和百分号偶尔不准，属 Qwen-VL 视觉能力限制，需优化 OCR 提示词
-- `tesseract.js` CDN 在 index.html 中仍被引用但已不使用
-- `启动服务器.bat`、`pwa/启动PWA.bat`、`deploy/推送到GitHub.bat` 有编码损坏（中文乱码），且依赖旧 Node 路径
+- `deploy/` 目录是 PWA 的过期快照，功能落后于 `pwa/`（无保存/统计逻辑），且被 `.gitignore` 忽略，勿直接编辑
+- `.bat` 启动脚本均为 UTF-8 正常编码（此前的"乱码"报告系读取工具编码误判）；但其中 `cd /d` 使用绝对路径 `E:\3.省考备考\5.行测app`，移动项目位置后需同步修改
 
 ## 六、开发注意事项（重要）
 

@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：**v1.1.0**（语义化版本 SemVer）
+当前版本：**v2.0.0**（语义化版本 SemVer）
 
 版本号规则：`主版本.次版本.修订号`
 - 主版本：重大架构变更或不兼容改动
@@ -72,7 +72,11 @@ npm start
 ├── public/                # 本地服务器版前端
 │   ├── index.html
 │   ├── css/style.css
-│   └── js/app.js          # 核心逻辑（单文件）
+│   └── js/
+│       ├── app.js         # 主逻辑（自包含单体）
+│       ├── storage.js     # IndexedDB 存储（错题本/统计依赖）
+│       ├── stats.js       # 统计图表渲染（Chart.js）
+│       └── export.js      # JSON/CSV/PDF 导出
 ├── pwa/                   # PWA 纯前端版
 │   ├── index.html
 │   ├── app.js             # 直接调用 API，无后端
