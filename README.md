@@ -84,7 +84,7 @@ npm start
 │   ├── build.js           # 提示词打包脚本
 │   ├── manifest.json      # PWA 清单
 │   └── sw.js              # Service Worker
-├── deploy/                # GitHub Pages 部署目录
+├── deploy/                # PWA 发布快照（由 pwa/ 同步，勿直接编辑）
 ├── docs/                  # 项目文档
 └── 参考截图/               # OCR 测试样本
 ```
