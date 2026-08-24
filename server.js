@@ -46,6 +46,7 @@ async function callDeepSeek(apiKey, systemPrompt, userContent, temperature = 0.4
       "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(180000), // 防止调用挂死
   });
 
   if (!response.ok) {
@@ -152,7 +153,7 @@ function classifyLocally(text) {
   const rules = [
     { module: "资料分析", kws: ["同比", "环比", "增长率", "增长量", "比重", "倍数", "平均数", "百分点", "现期", "基期", "复合增长率"] },
     { module: "数量关系", kws: ["方程", "工程问题", "行程", "利润", "排列组合", "概率", "几何", "浓度", "容斥", "最值", "等差数列", "等比数列", "追及", "相遇", "牛吃草"] },
-    { module: "判断推理", kws: ["图形推理", "类比推理", "定义判断", "逻辑判断", "翻译推理", "加强", "削弱", "真假推理", "充分条件", "必要条件", "一笔画", "对称"] },
+    { module: "判断推理", kws: ["图形推理", "类比推理", "定义判断", "逻辑判断", "翻译推理", "真假推理", "充分条件", "必要条件", "一笔画", "对称", "最能加强", "最能削弱", "加强论证", "削弱论证", "加强项", "削弱项"] },
     { module: "言语理解", kws: ["选词填空", "成语辨析", "主旨概括", "意图判断", "标题选择", "语句排序", "语句衔接", "实词", "虚词"] },
     { module: "政治理论", kws: ["二十大", "中全会", "习近平", "新质生产力", "中国特色社会主义", "马克思主义", "党史", "党建", "总体布局", "五位一体"] },
     { module: "常识判断", kws: ["民法典", "宪法", "行政法", "刑法", "诉讼法", "历史常识", "地理常识", "科技常识", "生物常识", "物理常识", "化学常识"] },
@@ -280,8 +281,9 @@ app.post("/api/analyze", async (req, res) => {
         rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4, "deepseek-chat");
       }
     } else {
-      const model = (module === "数量关系" || module === "判断推理") ? "deepseek-reasoner" : "deepseek-chat";
-      rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4, model);
+      // 默认全部使用 deepseek-chat（响应快、稳定）。deepseek-reasoner 推理更严谨但耗时数倍且
+      // 可能因思考过长截断输出，已默认停用；如需启用可在 callDeepSeek 第 5 参传入 "deepseek-reasoner"
+      rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4, "deepseek-chat");
     }
     const analysis = parseAnalysis(rawResult, module);
     res.json(analysis);
