@@ -290,6 +290,26 @@ analyzeBtn.addEventListener('click', function(){
 function stripJsonHeader(md) {
   return md ? md.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g, '').trim() : md;
 }
+function renderQuickAsk(cVal, uVal) {
+  var qa=document.getElementById('quickAsk');if(!qa)return;
+  qa.innerHTML='';
+  var wrong=(uVal&&cVal&&uVal!==cVal)?uVal:'';
+  var qs=[];
+  if(wrong)qs.push('\u4E3A\u4EC0\u4E48 '+wrong+' \u9009\u9879\u9519\uFF1F');
+  qs.push('\u9010\u9879\u8BB2\u89E3\u56DB\u4E2A\u9009\u9879');
+  qs.push('\u8FD9\u9053\u9898\u6709\u4EC0\u4E48\u5FEB\u901F\u89E3\u6CD5\uFF1F');
+  qs.push('\u8FD9\u9053\u9898\u7684\u6838\u5FC3\u8003\u70B9\u662F\u4EC0\u4E48\uFF1F');
+  qs.forEach(function(q){
+    var b=document.createElement('button');
+    b.className='btn btn-small quick-btn';
+    b.textContent=q;
+    b.onclick=function(){
+      if(!lastAnalysisData){showToast('\u8BF7\u5148\u89E3\u6790\u9898\u76EE','error');return;}
+      chatInput.value=q;sendChat();
+    };
+    qa.appendChild(b);
+  });
+}
 function renderFullAnalysis(data) {
   document.getElementById('resultModule').textContent=data.module||'';
   document.getElementById('resultCategory').textContent=data.module||'';
@@ -297,11 +317,25 @@ function renderFullAnalysis(data) {
   if(data.difficulty){df.textContent=data.difficulty;df.className='difficulty-badge '+(data.difficulty==='\u56F0\u96BE'?'hard':data.difficulty==='\u7B80\u5355'?'easy':'medium');}
   else{df.textContent='';df.className='difficulty-badge';}
   if(data.answerSuspicious){showToast('\u26A0\uFE0F \u6A21\u578B\u5224\u5B9A\u8BC6\u522B\u7684\u6B63\u786E\u7B54\u6848\u7591\u4F3C\u6709\u8BEF\uFF0C\u8BF7\u6838\u5BF9\u9898\u76EE', 'error');}
+  // 答案对比卡
+  var ca2=document.querySelector('input[name="correctAnswer"]:checked');
+  var ua2=document.querySelector('input[name="userAnswer"]:checked');
+  var cVal=ca2?ca2.value:'', uVal=ua2?ua2.value:'';
+  var ac=document.getElementById('answerCompare');
+  var acHtml='<span class="ac-correct">\u2705 \u6B63\u786E\u7B54\u6848\uFF1A'+(cVal||'\u672A\u77E5')+'</span>';
+  if(uVal){acHtml+='<span class="ac-user '+(cVal===uVal?'right':'wrong')+'">\u6211\u7684\u7B54\u6848\uFF1A'+uVal+(cVal&&cVal===uVal?' \u2713':' \u2717')+'</span>';}
+  if(cVal||uVal){ac.innerHTML=acHtml;ac.style.display='flex';}else{ac.style.display='none';}
+  // 陷阱预警卡
+  var trap=document.getElementById('resultTrap');
+  if(data.tips&&data.tips.trim()){document.getElementById('trapContent').textContent=data.tips;trap.style.display='block';}
+  else{trap.style.display='none';}
   var cleanMd=stripJsonHeader(data.rawMarkdown||data.solution||'');
   resultFullAnalysis.innerHTML=cleanMd?marked.parse(cleanMd):'';
   try{if(typeof renderMathInElement!=='undefined')renderMathInElement(resultFullAnalysis,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}
   var kd=document.getElementById('resultKnowledge');
   kd.innerHTML=(data.knowledgePoints||[]).map(function(k){return'<span class="knowledge-tag">'+escapeHtml(k)+'</span>'}).join('');
+  // 快捷追问按钮
+  renderQuickAsk(cVal,uVal);
   document.getElementById('correctCheck').checked=false;
 }
 
@@ -313,7 +347,7 @@ document.getElementById('saveBtn').addEventListener('click',function(){
   var cr2=document.querySelector('input[name="correctAnswer"]:checked');
   storage.save({
     question:ocrText.value.trim().substring(0,300),solution:raw,answer:cr2?cr2.value:'',category:document.getElementById('resultCategory').textContent,
-    difficulty:'\u4E2D\u7B49',knowledgePoints:kps,tips:'',isCorrect:document.getElementById('correctCheck').checked,
+    difficulty:(lastAnalysisData&&lastAnalysisData.difficulty)||'\u4E2D\u7B49',knowledgePoints:kps,tips:(lastAnalysisData&&lastAnalysisData.tips)||'',isCorrect:document.getElementById('correctCheck').checked,
     imageData:currentImageData||'',rawMarkdown:raw,userAnswer:ur2?ur2.value:'',userThought:userThoughtInput.value.trim(),conversations:[]
   }).then(function(id){currentRecordId=id;showToast('\u5DF2\u4FDD\u5B58','success')}).catch(function(){showToast('\u4FDD\u5B58\u5931\u8D25')});
 });
@@ -450,7 +484,7 @@ window.viewReviewCard=function(id){
     userThoughtInput.value=r.userThought||'';
     thoughtSection.style.display='block';analyzeBtn.style.display='block';
     // Render saved analysis
-    lastAnalysisData={module:r.category||'',rawMarkdown:r.rawMarkdown||r.solution||'',knowledgePoints:r.knowledgePoints||[]};
+    lastAnalysisData={module:r.category||'',rawMarkdown:r.rawMarkdown||r.solution||'',knowledgePoints:r.knowledgePoints||[],tips:r.tips||'',difficulty:r.difficulty||''};
     currentRecordId=r.id;
     renderFullAnalysis(lastAnalysisData);
     resultPlaceholder.style.display='none';analysisResult.style.display='block';

@@ -149,6 +149,13 @@
               <span class="category-badge" id="resultCategory"></span>
               <span class="difficulty-badge" id="resultDifficulty"></span>
             </div>
+            <!-- 答案对比卡 -->
+            <div id="answerCompare" class="answer-compare" style="display:none"></div>
+            <!-- 陷阱预警卡 -->
+            <div class="result-section" id="resultTrap" style="display:none">
+              <h3>⚠️ 陷阱预警</h3>
+              <div id="trapContent" class="trap-content"></div>
+            </div>
             <!-- 全要素解析渲染区 -->
             <div id="resultFullAnalysis" class="solution-text markdown-body"></div>
 
@@ -178,6 +185,7 @@
                     也可以输入你的解题思路："<strong>我当时的想法是…</strong>"
                   </div>
                 </div>
+                <div id="quickAsk" class="quick-ask"></div>
                 <div class="chat-input-row">
                   <button class="mic-btn mic-btn-sm" data-target="chatInput" title="语音输入">🎤</button>
                   <textarea id="chatInput" rows="2" placeholder="输入你的问题或思路…" class="chat-textarea"></textarea>
