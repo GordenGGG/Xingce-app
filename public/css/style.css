@@ -1373,3 +1373,18 @@ body {
   color: var(--text-secondary);
   margin-left: 8px;
 }
+
+/* ===== 解析正文标题层级醒目化 ===== */
+.solution-text.markdown-body h3 {
+  margin-top: 18px;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border-left: 4px solid var(--primary);
+  border-radius: 0 8px 8px 0;
+  font-size: 1.05rem;
+}
+.solution-text.markdown-body h4 {
+  margin-top: 14px;
+  color: var(--primary);
+  font-size: 0.98rem;
+}

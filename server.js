@@ -116,11 +116,11 @@ function parseAnalysis(raw, module) {
     structured = null;
   }
 
-  // 第二步：旧正则回退（JSON 缺失或某字段缺失时使用）
-  const questionMatch = raw.match(/###\s*📌\s*题目原文\s*\n([\s\S]*?)(?=###|🔑|$)/);
-  const answerMatch = raw.match(/###\s*✅\s*正确答案\s*\n([\s\S]*?)(?=###|📚|⚠️|$)/);
-  const knowledgeMatch = raw.match(/###\s*📚\s*核心知识点[积累学]*\s*\n([\s\S]*?)(?=###|⚠️|$)/);
-  const tipsMatch = raw.match(/###\s*⚠️\s*同类陷阱[预警]*\s*\n([\s\S]*?)(?=$)/);
+  // 第二步：旧正则回退（JSON 缺失或某字段缺失时使用；兼容新旧两种标题写法）
+  const questionMatch = raw.match(/(?:##\s*一、题目原文|###\s*📌\s*题目原文)\s*\n([\s\S]*?)(?=##|###|####|🔑|$)/);
+  const answerMatch = raw.match(/(?:###\s*✅\s*正确答案|###\s*正确答案)\s*\n([\s\S]*?)(?=###|####|📚|⚠️|$)/);
+  const knowledgeMatch = raw.match(/(?:###\s*📚\s*核心知识点[积累学]*|###\s*核心知识点)\s*\n([\s\S]*?)(?=###|####|⚠️|$)/);
+  const tipsMatch = raw.match(/(?:###\s*⚠️\s*同类陷阱[预警]*|###\s*⚠️\s*同类题型速查卡|###\s*避坑指南|###\s*⚠️\s*第四步[：:]\s*避坑指南)\s*\n([\s\S]*?)(?=####|##|$)/);
   const fallbackKnowledge = knowledgeMatch
     ? knowledgeMatch[1]
         .trim()
@@ -318,7 +318,8 @@ ${analysisText || "（无）"}
 2. 如果学生说"我当时的思路是…"，请仔细分析这个思路的漏洞，指出错因，并给出正确思路
 3. 如果学生表达困惑，请用更通俗、更生动的方式解释
 4. 回答要具体、有针对性，像私教一对一辅导
-5. 关键概念用**加粗**标注`;
+5. 关键概念用**加粗**标注
+6. 用 Markdown 分点/小标题组织回答，保持与完整解析一致的排版风格（加粗、列表、层级清晰）`;
 
   const recentHistory = (history || []).slice(-10);
 

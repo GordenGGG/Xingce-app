@@ -301,6 +301,18 @@ analyzeBtn.addEventListener('click', function(){
 function stripJsonHeader(md) {
   return md ? md.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g, '').trim() : md;
 }
+function cleanMarkdown(md) {
+  if (!md) return md;
+  var s = stripJsonHeader(md);
+  // 剥离危险脚本标签
+  s = s.replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, '');
+  // 压缩连续 3 个以上空行
+  s = s.replace(/\n{3,}/g, '\n\n');
+  // 补闭合未闭合的代码块（奇数个 ```）
+  var fences = (s.match(/```/g) || []).length;
+  if (fences % 2 === 1) s += '\n```';
+  return s.trim();
+}
 function renderQuickAsk(cVal, uVal) {
   var qa=document.getElementById('quickAsk');if(!qa)return;
   qa.innerHTML='';
@@ -340,7 +352,7 @@ function renderFullAnalysis(data) {
   var trap=document.getElementById('resultTrap');
   if(data.tips&&data.tips.trim()){document.getElementById('trapContent').textContent=data.tips;trap.style.display='block';}
   else{trap.style.display='none';}
-  var cleanMd=stripJsonHeader(data.rawMarkdown||data.solution||'');
+  var cleanMd=cleanMarkdown(data.rawMarkdown||data.solution||'');
   resultFullAnalysis.innerHTML=cleanMd?marked.parse(cleanMd):'';
   try{if(typeof renderMathInElement!=='undefined')renderMathInElement(resultFullAnalysis,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}
   var kd=document.getElementById('resultKnowledge');
