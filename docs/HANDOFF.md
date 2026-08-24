@@ -71,7 +71,7 @@
 ### 3.3 POST /api/analyze
 - 入参：`{ text, module, userThought, userAnswer, detectedCorrect, apiKey }`
 - 出参：`{ module, question, answer, solution, knowledgePoints[], tips, difficulty, answerSuspicious, rawMarkdown }`
-- AI：DeepSeek（两阶段：分类 + 深度解析）；数量关系/判断推理使用 `deepseek-reasoner`，其余使用 `deepseek-chat`
+- AI：DeepSeek（两阶段：分类 + 深度解析）；**政治理论**使用 Responses API（`/v1/responses`）内置 `web_search` 联网搜索（时政以检索结果为准并标注来源，失败自动回退普通调用）；数量关系/判断推理使用 `deepseek-reasoner`，其余使用 `deepseek-chat`
 - 提示词协议：六大模板要求模型**先输出 JSON 结构头**（`<<<JSON_START>>>…<<<JSON_END>>>`，含 question/answer/knowledgePoints/trap/difficulty/answerSuspicious），**再输出完整解析 Markdown**；`parseAnalysis` 优先解析 JSON 头，字段缺失回退旧正则；返回的 `rawMarkdown` 已剥离 JSON 头
 - `answerSuspicious: true` 表示模型判定注入的"正确答案"与题目内容矛盾（OCR 识别纠错信号）
 
