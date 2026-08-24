@@ -1,4 +1,4 @@
-﻿// ===== IndexedDB 存储模块 =====
+// ===== IndexedDB 存储模块 =====
 const DB_NAME = "XingCeApp";
 const DB_VERSION = 2;
 const STORE_NAME = "questions";
@@ -85,8 +85,9 @@ class Storage {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
-      store.delete(id).onsuccess = () => resolve();
-      store.delete(id).onerror = () => reject();
+      const request = store.delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
     });
   }
 
@@ -94,8 +95,9 @@ class Storage {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE_NAME, "readonly");
       const store = tx.objectStore(STORE_NAME);
-      store.get(id).onsuccess = (e) => resolve(e.target.result);
-      store.get(id).onerror = () => reject();
+      const request = store.get(id);
+      request.onsuccess = (e) => resolve(e.target.result);
+      request.onerror = () => reject(request.error);
     });
   }
 
