@@ -65,13 +65,15 @@
 
 ### 3.2 POST /api/classify
 - 入参：`{ text: string, apiKey: string }`
-- 出参：`{ module: string }`
-- AI：DeepSeek（轻量分类）
+- 出参：`{ module: string, source: "local" | "llm" }`
+- AI：DeepSeek（轻量分类）；命中本地关键词规则时直接返回（`source: "local"`，无需 API Key）
 
 ### 3.3 POST /api/analyze
 - 入参：`{ text, module, userThought, userAnswer, detectedCorrect, apiKey }`
-- 出参：完整 Markdown 解析（含知识点、原始 Markdown）
-- AI：DeepSeek（两阶段：分类 + 深度解析）
+- 出参：`{ module, question, answer, solution, knowledgePoints[], tips, difficulty, answerSuspicious, rawMarkdown }`
+- AI：DeepSeek（两阶段：分类 + 深度解析）；数量关系/判断推理使用 `deepseek-reasoner`，其余使用 `deepseek-chat`
+- 提示词协议：六大模板要求模型**先输出 JSON 结构头**（`<<<JSON_START>>>…<<<JSON_END>>>`，含 question/answer/knowledgePoints/trap/difficulty/answerSuspicious），**再输出完整解析 Markdown**；`parseAnalysis` 优先解析 JSON 头，字段缺失回退旧正则；返回的 `rawMarkdown` 已剥离 JSON 头
+- `answerSuspicious: true` 表示模型判定注入的"正确答案"与题目内容矛盾（OCR 识别纠错信号）
 
 ### 3.4 POST /api/chat
 - 入参：`{ questionText, analysisText, history, message, apiKey }`
