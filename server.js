@@ -58,6 +58,40 @@ async function callDeepSeek(apiKey, systemPrompt, userContent, temperature = 0.4
   return data.choices?.[0]?.message?.content || "";
 }
 
+// ===== DeepSeek Responses API（内置 web_search 联网搜索，用于政治理论模块） =====
+async function callDeepSeekSearch(apiKey, systemPrompt, userContent) {
+  const response = await fetch("https://api.deepseek.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      tools: [{ type: "web_search" }],
+      input: [
+        { role: "system", content: [{ type: "input_text", text: systemPrompt }] },
+        { role: "user", content: [{ type: "input_text", text: userContent }] },
+      ],
+    }),
+    signal: AbortSignal.timeout(120000), // 联网搜索较慢，120s 上限
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    if (response.status === 401) throw { status: 401, message: "API Key 无效，请检查后重试" };
+    throw { status: response.status, message: "DeepSeek 联网搜索调用失败: " + err };
+  }
+
+  const data = await response.json();
+  // Responses API 输出：output 数组中的 message 项，content 里 type=output_text 的 text
+  const outputs = data.output || [];
+  return outputs
+    .filter((o) => o.type === "message")
+    .map((o) => (o.content || []).map((c) => (c.type === "output_text" ? c.text : "")).join(""))
+    .join("");
+}
+
 // 解析标准化：优先解析双层输出协议的 JSON 结构头，字段缺失时回退旧正则
 function parseAnalysis(raw, module) {
   const fallback = {
@@ -230,9 +264,25 @@ app.post("/api/analyze", async (req, res) => {
       prompt += "\n\n【本题考生做错了或答案未确认】请按错因诊断模式，结合考生思考过程深挖选错原因，直指思维漏洞，并给出纠正后的正确思路。";
     }
 
-    // 按模块选择模型：数量关系/判断推理（硬推理）用 deepseek-reasoner，其余用 deepseek-chat
-    const model = (module === "数量关系" || module === "判断推理") ? "deepseek-reasoner" : "deepseek-chat";
-    const rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4, model);
+    // 政治理论：启用内置联网搜索（Responses API + web_search），时政以检索结果为准
+    // 其余模块：数量关系/判断推理（硬推理）用 deepseek-reasoner，其余用 deepseek-chat
+    let rawResult;
+    if (module === "政治理论") {
+      try {
+        rawResult = await callDeepSeekSearch(
+          apiKey,
+          "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。你已接入联网搜索：涉及最新时政（会议、政策、领导人讲话、官方表述）时，必须优先依据联网检索到的官方信息并标注来源；如检索结果与记忆冲突，以检索结果为准。",
+          prompt
+        );
+      } catch (searchErr) {
+        // 联网搜索失败时回退普通调用，保证解析可用
+        console.error("联网搜索失败，回退普通解析:", searchErr.message);
+        rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4, "deepseek-chat");
+      }
+    } else {
+      const model = (module === "数量关系" || module === "判断推理") ? "deepseek-reasoner" : "deepseek-chat";
+      rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4, model);
+    }
     const analysis = parseAnalysis(rawResult, module);
     res.json(analysis);
   } catch (err) {
