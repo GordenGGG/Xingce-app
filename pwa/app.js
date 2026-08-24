@@ -137,7 +137,7 @@ ab.addEventListener('click',function(){
     return callDS('你是专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。',p,0.4)
   }).then(function(r){lastAnalysis={module:'',rawMarkdown:r,knowledgePoints:[]};renderAnalysis(r);rph.style.display='none';ar.style.display='block';resetChat();toast('解析完成','success')}).catch(function(e){rph.innerHTML='<span class="result-icon">\u274C</span><p>'+e.message+'</p>';toast(e.message,'error')}).finally(function(){ab.disabled=false;ab.textContent='\u{1F916} DeepSeek智能解析'})
 });
-function renderAnalysis(r){document.getElementById('resultFullAnalysis').innerHTML=marked.parse(r);try{if(typeof renderMathInElement!=='undefined')renderMathInElement(rfa,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}}
+function renderAnalysis(r){var c=r.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g,'').trim();document.getElementById('resultFullAnalysis').innerHTML=marked.parse(c);try{if(typeof renderMathInElement!=='undefined')renderMathInElement(rfa,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}}
 
 // ===== Voice =====
 var mr=null,ac=[],ms=null,cmb=null,sov='';

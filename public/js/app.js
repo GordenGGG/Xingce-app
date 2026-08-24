@@ -287,6 +287,9 @@ analyzeBtn.addEventListener('click', function(){
   .finally(function(){analyzeBtn.disabled=false;analyzeBtn.textContent='\u{1F916} DeepSeek \u667A\u80FD\u89E3\u6790';});
 });
 
+function stripJsonHeader(md) {
+  return md ? md.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g, '').trim() : md;
+}
 function renderFullAnalysis(data) {
   document.getElementById('resultModule').textContent=data.module||'';
   document.getElementById('resultCategory').textContent=data.module||'';
@@ -294,7 +297,8 @@ function renderFullAnalysis(data) {
   if(data.difficulty){df.textContent=data.difficulty;df.className='difficulty-badge '+(data.difficulty==='\u56F0\u96BE'?'hard':data.difficulty==='\u7B80\u5355'?'easy':'medium');}
   else{df.textContent='';df.className='difficulty-badge';}
   if(data.answerSuspicious){showToast('\u26A0\uFE0F \u6A21\u578B\u5224\u5B9A\u8BC6\u522B\u7684\u6B63\u786E\u7B54\u6848\u7591\u4F3C\u6709\u8BEF\uFF0C\u8BF7\u6838\u5BF9\u9898\u76EE', 'error');}
-  resultFullAnalysis.innerHTML=data.rawMarkdown?marked.parse(data.rawMarkdown):(data.solution?marked.parse(data.solution):'');
+  var cleanMd=stripJsonHeader(data.rawMarkdown||data.solution||'');
+  resultFullAnalysis.innerHTML=cleanMd?marked.parse(cleanMd):'';
   try{if(typeof renderMathInElement!=='undefined')renderMathInElement(resultFullAnalysis,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}
   var kd=document.getElementById('resultKnowledge');
   kd.innerHTML=(data.knowledgePoints||[]).map(function(k){return'<span class="knowledge-tag">'+escapeHtml(k)+'</span>'}).join('');

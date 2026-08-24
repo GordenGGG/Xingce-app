@@ -81,8 +81,8 @@ function parseAnalysis(raw, module) {
   // 第二步：旧正则回退（JSON 缺失或某字段缺失时使用）
   const questionMatch = raw.match(/###\s*📌\s*题目原文\s*\n([\s\S]*?)(?=###|🔑|$)/);
   const answerMatch = raw.match(/###\s*✅\s*正确答案\s*\n([\s\S]*?)(?=###|📚|⚠️|$)/);
-  const knowledgeMatch = raw.match(/###\s*📚\s*核心知识点[积学]*\s*\n([\s\S]*?)(?=###|⚠️|$)/);
-  const tipsMatch = raw.match(/###\s*⚠️\s*同类陷阱[预]*\s*\n([\s\S]*?)(?=$)/);
+  const knowledgeMatch = raw.match(/###\s*📚\s*核心知识点[积累学]*\s*\n([\s\S]*?)(?=###|⚠️|$)/);
+  const tipsMatch = raw.match(/###\s*⚠️\s*同类陷阱[预警]*\s*\n([\s\S]*?)(?=$)/);
   const fallbackKnowledge = knowledgeMatch
     ? knowledgeMatch[1]
         .trim()
@@ -91,18 +91,21 @@ function parseAnalysis(raw, module) {
         .map((l) => l.replace(/^[\d.\-•]+\s*/, "").trim())
     : [];
 
+  // 剥离 JSON 结构头，正文 Markdown 保持干净（用于渲染/保存/导出/对话上下文）
+  const cleanedRaw = raw.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g, "").trim();
+
   return {
     module,
     question: (structured && structured.question) || (questionMatch ? questionMatch[1].trim() : ""),
     answer: (structured && structured.answer) || (answerMatch ? answerMatch[1].trim() : ""),
-    solution: raw, // 完整 Markdown 作为 solution
+    solution: cleanedRaw, // 完整 Markdown 作为 solution
     knowledgePoints: Array.isArray(structured && structured.knowledgePoints) && structured.knowledgePoints.length
       ? structured.knowledgePoints
       : fallbackKnowledge,
     tips: (structured && structured.trap) || (tipsMatch ? tipsMatch[1].trim() : ""),
     difficulty: (structured && structured.difficulty) || "",
     answerSuspicious: !!(structured && structured.answerSuspicious),
-    rawMarkdown: raw,
+    rawMarkdown: cleanedRaw,
   };
 }
 
