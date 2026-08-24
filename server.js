@@ -27,22 +27,25 @@ function getApiKey(req) {
   return req.body.apiKey || "";
 }
 
-async function callDeepSeek(apiKey, systemPrompt, userContent, temperature = 0.4) {
+async function callDeepSeek(apiKey, systemPrompt, userContent, temperature = 0.4, model = "deepseek-chat") {
+  const body = {
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ],
+    max_tokens: 8192,
+  };
+  // deepseek-reasoner 不支持 temperature 参数
+  if (model !== "deepseek-reasoner") body.temperature = temperature;
+
   const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model: "deepseek-chat",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      temperature,
-      max_tokens: 4096,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -227,7 +230,9 @@ app.post("/api/analyze", async (req, res) => {
       prompt += "\n\n【本题考生做错了或答案未确认】请按错因诊断模式，结合考生思考过程深挖选错原因，直指思维漏洞，并给出纠正后的正确思路。";
     }
 
-    const rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4);
+    // 按模块选择模型：数量关系/判断推理（硬推理）用 deepseek-reasoner，其余用 deepseek-chat
+    const model = (module === "数量关系" || module === "判断推理") ? "deepseek-reasoner" : "deepseek-chat";
+    const rawResult = await callDeepSeek(apiKey, "你是一个专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。", prompt, 0.4, model);
     const analysis = parseAnalysis(rawResult, module);
     res.json(analysis);
   } catch (err) {
