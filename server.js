@@ -294,7 +294,8 @@ app.post("/api/analyze", async (req, res) => {
 
 // ===== 接续对话 =====
 app.post("/api/chat", async (req, res) => {
-  const { questionText, analysisText, history, message } = req.body;
+  const { questionText, analysisText, history, message, mode, module: chatModule,
+          answer, userAnswer, isCorrect, knowledgePoints, tips } = req.body;
   if (!message || !message.trim()) {
     return res.status(400).json({ error: "消息不能为空" });
   }
@@ -304,22 +305,84 @@ app.post("/api/chat", async (req, res) => {
     return res.status(401).json({ error: "no_api_key", message: "请先在设置中配置 DeepSeek API Key" });
   }
 
-  const systemPrompt = `你是一位耐心、专业的行测辅导老师。现在学生正在针对一道行测题目进行追问。
-你了解这道题的完整内容和解析。请根据学生的追问，给出针对性、详细的解答。
+  const kps = Array.isArray(knowledgePoints) ? knowledgePoints : [];
+  const summaryLines = [
+    "- 模块：" + (chatModule || "未知"),
+    "- 正确答案：" + (answer || "未知"),
+    "- 我的答案：" + (userAnswer || "未作答"),
+    (typeof isCorrect === "boolean" ? "- 对错：" + (isCorrect ? "做对了" : "做错了") : ""),
+    "- 本题考点/知识点：" + (kps.join("；") || "（无）"),
+    "- 核心陷阱：" + (tips || "（无）"),
+  ].filter(Boolean).join("\n");
+
+  // ===== 复盘小结模式：把零散追问（含学生大白话）沉淀为规范学习要点 =====
+  if (mode === "summary") {
+    const summaryPrompt = `你是行测学习复盘教练。学生刚完成对一道行测题的多轮追问，请把这段对话（含学生用大白话表达的疑惑与理解）沉淀为一份**规范的学习复盘小结**，方便日后复习。
 
 题目原文：
 ${questionText || "（无）"}
+
+解析摘要：
+${summaryLines}
+
+【格式要求 - 严格遵循】
+1. **我的理解（规范化）**：把学生对话中用大白话表达的理解/困惑，转化为准确规范的专业表述（保留原意，用专业术语重写，不嘲笑不简化）
+2. **本题考点**：一句话概括
+3. **核心概念**：3-5 个本对话涉及的概念，每个用"一句话定义"
+4. **认知偏差/错因**：若对话中有错误理解或做错，归纳错因；若理解正确，写"概念理解基本正确，已确认"
+5. **正确解题逻辑**：本题的推导链条（分步骤）
+6. **一句话记忆点**：方便下次复习的口诀或要点
+
+输出用 Markdown 分点，全文控制在 300 字内，关键概念**加粗**。`;
+
+    const messages = [
+      { role: "system", content: summaryPrompt },
+      ...(history || []).slice(-15).map((h) => ({
+        role: h.role === "user" ? "user" : "assistant",
+        content: h.content,
+      })),
+      { role: "user", content: message },
+    ];
+    try {
+      const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: "deepseek-chat", messages, temperature: 0.4, max_tokens: 2048 }),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        if (response.status === 401) throw { status: 401, message: "API Key 无效" };
+        throw { status: response.status, message: "DeepSeek 调用失败: " + err };
+      }
+      const data = await response.json();
+      const reply = data.choices?.[0]?.message?.content || "抱歉，暂时无法生成复盘小结。";
+      return res.json({ reply, summary: true });
+    } catch (err) {
+      return res.status(err.status || 500).json({ error: err.message || "复盘小结失败" });
+    }
+  }
+
+  // ===== 普通追问模式 =====
+  const systemPrompt = `你是一位耐心、专业的行测辅导老师。学生正在针对一道行测题进行追问——他常用大白话表达自己的理解和困惑，你的目标不是直接给答案，而是**帮他把朴素的想法转化为准确的理解，真正弄懂这道题背后的概念与逻辑**。
+
+题目原文：
+${questionText || "（无）"}
+
+解析摘要：
+${summaryLines}
 
 完整解析：
 ${analysisText || "（无）"}
 
 对话规则：
-1. 如果学生问某个选项为什么错，请深入展开该选项的"设错本质"
-2. 如果学生说"我当时的思路是…"，请仔细分析这个思路的漏洞，指出错因，并给出正确思路
-3. 如果学生表达困惑，请用更通俗、更生动的方式解释
-4. 回答要具体、有针对性，像私教一对一辅导
-5. 关键概念用**加粗**标注
-6. 用 Markdown 分点/小标题组织回答，保持与完整解析一致的排版风格（加粗、列表、层级清晰）`;
+1. **概念讲解模式**：当学生询问概念/术语含义（如"一级医院是什么""统筹是什么意思"），用三步讲解：①大白话定义（一句话，优先生活化类比）②官方语境/政策背景 ③与本题考点的关联。不要学术腔，像给朋友讲明白
+2. **想法验证模式**：当学生说出自己的理解（"所以X就是Y？""我的理解是…"），先明确表态：「你的理解是对的」/「基本对，但有个细节要纠正」/「这个理解有偏差」。对的用一句话肯定并补充1-2个关键细节；有偏差的明确指出偏差点、给出正确理解，并说明为什么容易混淆
+3. 如果学生问某个选项为什么错：深入展开该选项的"设错本质"
+4. 如果学生说做题思路：仔细分析思路漏洞、指出错因、给出正确思路
+5. 如果学生表达困惑：用更通俗、生动的方式解释
+6. 回答像私教一对一，具体、有针对性，善用生活类比
+7. 关键概念用**加粗**标注
+8. 用 Markdown 分点/小标题组织回答，保持与完整解析一致的排版风格`;
 
   const recentHistory = (history || []).slice(-10);
 

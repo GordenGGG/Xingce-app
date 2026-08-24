@@ -1295,6 +1295,17 @@ body {
   background: #e0e7ff;
   border-color: #c7d2fe;
 }
+.summary-actions {
+  padding: 0 14px 10px;
+}
+.summary-actions .btn {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.summary-actions .btn:hover {
+  background: #d1fae5;
+}
 
 /* ===== 错题本批量操作与掌握状态 ===== */
 .batch-bar {

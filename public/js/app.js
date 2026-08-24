@@ -482,22 +482,41 @@ function addChatMessage(role,content){
   d.appendChild(t);chatMessages.appendChild(d);chatMessages.scrollTop=chatMessages.scrollHeight;
   chatHistory.push({role:role,content:content,time:new Date().toISOString()});
 }
-function sendChat(){
-  var m=chatInput.value.trim();
+function sendChat(mode){
+  var m=(mode==='summary')?'\u8BF7\u751F\u6210\u590D\u76D8\u5C0F\u7ED3':chatInput.value.trim();
   if(!m||isChatLoading)return;
   if(!lastAnalysisData){showToast('\u8BF7\u5148\u89E3\u6790\u9898\u76EE','error');return}
   if(!hasApiKey()){showToast('\u8BF7\u914D\u7F6E API Key','error');openSettings();return}
+  // 组装结构化信息（正确答案/我的答案/对错/知识点/陷阱）
+  var cA=document.querySelector('input[name="correctAnswer"]:checked');
+  var uA=document.querySelector('input[name="userAnswer"]:checked');
+  var cVal=cA?cA.value:'', uVal=uA?uA.value:'';
+  var isRight=(uVal&&cVal)?(uVal===cVal):null;
   isChatLoading=true;chatSendBtn.disabled=true;chatInput.value='';
   addChatMessage('user',m);
   var ty=document.createElement('div');ty.className='chat-typing';ty.id='ct';ty.innerHTML='AI\u601D\u8003\u4E2D...';chatMessages.appendChild(ty);
-  fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({questionText:ocrText.value||'',analysisText:(lastAnalysisData.rawMarkdown||''),history:chatHistory.slice(0,-1),message:m,apiKey:getApiKey()})})
+  fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    questionText:ocrText.value||'',analysisText:(lastAnalysisData.rawMarkdown||''),history:chatHistory.slice(0,-1),message:m,apiKey:getApiKey(),
+    mode:mode||'',module:lastAnalysisData.module||'',answer:cVal,userAnswer:uVal,
+    isCorrect:(isRight===null?undefined:isRight),
+    knowledgePoints:lastAnalysisData.knowledgePoints||[],
+    tips:lastAnalysisData.tips||''
+  })})
   .then(function(r){var t=document.getElementById('ct');if(t)t.remove();if(!r.ok)return r.json().then(function(e){throw new Error(e.message||e.error)});return r.json()})
-  .then(function(d){addChatMessage('assistant',d.reply);if(currentRecordId){storage.addConversation(currentRecordId,{role:'user',content:m,time:chatHistory[chatHistory.length-2]?chatHistory[chatHistory.length-2].time:new Date().toISOString()});storage.addConversation(currentRecordId,{role:'assistant',content:d.reply,time:new Date().toISOString()})}})
+  .then(function(d){
+    addChatMessage('assistant',d.reply);
+    // 复盘小结：写回错题本 reviewSummary 字段
+    if(d.summary&&currentRecordId){
+      storage.update(currentRecordId,{reviewSummary:d.reply}).then(function(){showToast('\u590D\u76D8\u5C0F\u7ED3\u5DF2\u4FDD\u5B58\u5230\u9519\u9898\u672C','success')});
+    }
+    if(currentRecordId){storage.addConversation(currentRecordId,{role:'user',content:m,time:chatHistory[chatHistory.length-2]?chatHistory[chatHistory.length-2].time:new Date().toISOString()});storage.addConversation(currentRecordId,{role:'assistant',content:d.reply,time:new Date().toISOString()})}
+  })
   .catch(function(e){var t=document.getElementById('ct');if(t)t.remove();addChatMessage('assistant','\u62B1\u6B49: '+e.message)})
   .finally(function(){isChatLoading=false;chatSendBtn.disabled=false;chatInput.focus()});
 }
-chatSendBtn.addEventListener('click',sendChat);
+chatSendBtn.addEventListener('click',function(){sendChat();});
 chatInput.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}});
+document.getElementById('summaryBtn').addEventListener('click',function(){sendChat('summary');});
 
 // ===== Review =====
 // 多选状态
@@ -653,6 +672,7 @@ window.viewReviewCard=function(id){
     document.getElementById('correctCheck').checked=r.isCorrect||false;
     // Load conversations
     resetChat();
+    if(r.reviewSummary){addChatMessage('assistant','\u{1F4DD} **\u590D\u76D8\u5C0F\u7ED3**\n\n'+r.reviewSummary);}
     if(r.conversations&&r.conversations.length>0){r.conversations.forEach(function(msg){addChatMessage(msg.role,msg.content)})}
   });
 };
