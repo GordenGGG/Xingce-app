@@ -231,11 +231,14 @@
           <input type="date" id="filterDateStart" title="开始日期">
           <span>至</span>
           <input type="date" id="filterDateEnd" title="结束日期">
+          <input type="text" id="filterKeyword" class="form-input" style="width:180px" placeholder="🔍 搜索题目/解析/知识点">
         </div>
         <div class="action-group">
           <button id="exportJSONBtn" class="btn btn-small">📄 导出 JSON</button>
           <button id="exportCSVBtn" class="btn btn-small">📊 导出 CSV</button>
           <button id="exportPDFBtn" class="btn btn-small">🖨️ 导出 PDF</button>
+          <button id="importJSONBtn" class="btn btn-small">📥 导入 JSON</button>
+          <input type="file" id="importFileInput" accept=".json" hidden>
         </div>
       </div>
 
@@ -256,6 +259,7 @@
           <small>去「题目解析」上传并保存题目吧</small>
         </div>
       </div>
+      <div id="pagination" class="pagination"></div>
     </main>
 
     <!-- 统计看板页面 -->

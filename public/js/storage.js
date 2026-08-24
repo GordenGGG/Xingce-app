@@ -160,6 +160,16 @@ class Storage {
           const mastered = filters.mastered === "yes";
           results = results.filter((r) => !!r.mastered === mastered);
         }
+        if (filters.keyword && filters.keyword.trim()) {
+          const kw = filters.keyword.trim().toLowerCase();
+          results = results.filter(
+            (r) =>
+              (r.question || "").toLowerCase().includes(kw) ||
+              (r.solution || "").toLowerCase().includes(kw) ||
+              (r.rawMarkdown || "").toLowerCase().includes(kw) ||
+              ((r.knowledgePoints || []).some((k) => (k || "").toLowerCase().includes(kw)))
+          );
+        }
         if (filters.dateStart) {
           const start = new Date(filters.dateStart).getTime();
           results = results.filter((r) => new Date(r.createdAt).getTime() >= start);

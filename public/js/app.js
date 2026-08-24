@@ -504,15 +504,22 @@ function updateBatchBar(){
   });
 }
 // 筛选条件变化即刷新列表（修复筛选器不生效）
+var reviewPage=1, reviewPageSize=20;
 ['filterCategory','filterDifficulty','filterCorrect','filterMastered','filterDateStart','filterDateEnd'].forEach(function(id){
-  var el=document.getElementById(id); if(el) el.addEventListener('change', function(){clearSelection();renderReviewList();});
+  var el=document.getElementById(id); if(el) el.addEventListener('change', function(){reviewPage=1;clearSelection();renderReviewList();});
 });
+var kwEl=document.getElementById('filterKeyword');
+if(kwEl) kwEl.addEventListener('input', function(){reviewPage=1;clearSelection();renderReviewList();});
 function renderReviewList(){
-  var f={category:document.getElementById('filterCategory').value,difficulty:document.getElementById('filterDifficulty').value,isCorrect:document.getElementById('filterCorrect').value,mastered:document.getElementById('filterMastered').value,dateStart:document.getElementById('filterDateStart').value,dateEnd:document.getElementById('filterDateEnd').value};
+  var f={category:document.getElementById('filterCategory').value,difficulty:document.getElementById('filterDifficulty').value,isCorrect:document.getElementById('filterCorrect').value,mastered:document.getElementById('filterMastered').value,dateStart:document.getElementById('filterDateStart').value,dateEnd:document.getElementById('filterDateEnd').value,keyword:document.getElementById('filterKeyword').value};
   storage.getAll(f).then(function(data){
     var c=document.getElementById('reviewList');
-    if(!data||data.length===0){c.innerHTML='<div class="empty-state"><span>\u{1F4ED}</span><p>\u8FD8\u6CA1\u6709\u4FDD\u5B58\u7684\u9898\u76EE\u8BB0\u5F55</p></div>';return}
-    c.innerHTML=data.map(function(r,i){
+    if(!data||data.length===0){c.innerHTML='<div class="empty-state"><span>\u{1F4ED}</span><p>\u8FD8\u6CA1\u6709\u4FDD\u5B58\u7684\u9898\u76EE\u8BB0\u5F55</p></div>';renderPagination(1,0);return}
+    var total=data.length;
+    var pages=Math.max(1,Math.ceil(total/reviewPageSize));
+    if(reviewPage>pages)reviewPage=pages;
+    var slice=data.slice((reviewPage-1)*reviewPageSize, reviewPage*reviewPageSize);
+    c.innerHTML=slice.map(function(r,i){
       var sel=!!reviewSelected[r.id];
       return'<div class="review-card'+(r.mastered?' mastered':'')+(sel?' selected':'')+'" data-id="'+r.id+'">'
         +'<div class="review-card-header">'
@@ -530,8 +537,26 @@ function renderReviewList(){
         +'<button class="btn btn-small btn-danger" onclick="deleteReviewCard('+r.id+')">\u{1F5D1} \u5220\u9664</button>'
         +'</div></div>'
     }).join('');
+    renderPagination(pages,total);
   });
 }
+function renderPagination(pages,total){
+  var p=document.getElementById('pagination'); if(!p)return;
+  if(pages<=1){p.innerHTML='';return;}
+  var html='<button class="btn btn-small page-btn"'+(reviewPage<=1?' disabled':'')+' onclick="gotoPage('+(reviewPage-1)+')">\u4E0A\u4E00\u9875</button>';
+  for(var i=1;i<=pages;i++){
+    html+='<button class="btn btn-small page-btn'+(i===reviewPage?' active':'')+'" onclick="gotoPage('+i+')">'+i+'</button>';
+  }
+  html+='<button class="btn btn-small page-btn"'+(reviewPage>=pages?' disabled':'')+' onclick="gotoPage('+(reviewPage+1)+')">\u4E0B\u4E00\u9875</button>';
+  html+='<span class="page-total">\u5171 '+total+' \u6761\uFF0C\u7B2C '+reviewPage+'/'+pages+' \u9875</span>';
+  p.innerHTML=html;
+}
+window.gotoPage=function(pg){
+  if(pg<1)return;
+  reviewPage=pg;
+  clearSelection();
+  renderReviewList();
+};
 window.markMastered=function(id){
   storage.update(id,{mastered:true,masteredAt:new Date().toISOString()}).then(function(){renderReviewList();showToast('\u5DF2\u6807\u8BB0\u638C\u63E1','success')});
 };
@@ -605,6 +630,33 @@ document.getElementById('batchExportBtn').addEventListener('click',function(){
 document.getElementById('exportJSONBtn').addEventListener('click',function(){if(typeof exporter!=='undefined')exporter.exportJSON()});
 document.getElementById('exportCSVBtn').addEventListener('click',function(){if(typeof exporter!=='undefined')exporter.exportCSV()});
 document.getElementById('exportPDFBtn').addEventListener('click',function(){if(typeof exporter!=='undefined')exporter.exportPDF()});
+
+// ===== JSON 导入（数据恢复） =====
+document.getElementById('importJSONBtn').addEventListener('click',function(){document.getElementById('importFileInput').click();});
+document.getElementById('importFileInput').addEventListener('change',function(e){
+  var f=e.target.files[0]; if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var arr=JSON.parse(ev.target.result);
+      if(!Array.isArray(arr)){showToast('\u5BFC\u5165\u5931\u8D25\uFF1A\u6587\u4EF6\u4E0D\u662F\u6570\u7EC4','error');return;}
+      var count=0;
+      var chain=Promise.resolve();
+      arr.forEach(function(rec){
+        chain=chain.then(function(){
+          var rec2={}; for(var k in rec){ if(k!=='id')rec2[k]=rec[k]; }
+          if(!rec2.createdAt)rec2.createdAt=new Date().toISOString();
+          if(!rec2.conversations)rec2.conversations=[];
+          return storage.save(rec2).then(function(){count++;});
+        });
+      });
+      chain.then(function(){showToast('\u5BFC\u5165\u5B8C\u6210 '+count+' \u6761','success');renderReviewList();})
+            .catch(function(){showToast('\u5BFC\u5165\u4E2D\u65AD\uFF0C\u5DF2\u5BFC\u5165 '+count+' \u6761','error');renderReviewList();});
+    }catch(err){showToast('\u5BFC\u5165\u5931\u8D25\uFF1AJSON \u89E3\u6790\u9519\u8BEF','error');}
+    e.target.value='';
+  };
+  reader.readAsText(f);
+});
 
 // ===== Init =====
 storage.init().then(function(){console.log('DB OK')}).catch(function(e){console.error(e)});
