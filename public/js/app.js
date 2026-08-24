@@ -168,7 +168,7 @@ ocrBtn.addEventListener('click', function(){
     progressFill.style.width = '100%'; ocrStatusEl.textContent = '\u8BC6\u522B\u5B8C\u6210';
     setTimeout(function(){
       ocrProgress.style.display = 'none'; ocrResult.style.display = 'block';
-      ocrText.value = data.question || '';
+      ocrText.value = normalizeQuestionText(data.question || '');
       var qCorrect = data.correctAnswer || '';
       var qUser = data.userAnswer || '';
       if (!qCorrect || !qUser) { var fb = parseAnswersFromText(ocrText.value); if (!qCorrect && fb.correct) qCorrect = fb.correct; if (!qUser && fb.user) qUser = fb.user; }
@@ -189,24 +189,45 @@ ocrBtn.addEventListener('click', function(){
 // ===== Answer extraction =====
 function parseAnswersFromText(text) {
   var result = { correct: '', user: '' };
+  if (!text) return result;
   var lines = text.split(/\n/);
-  for (var li=lines.length-1; li>=Math.max(0,lines.length-20); li--) {
-    var ln = lines[li].replace(/\s+/g, '');
-    if (ln.indexOf('\u6B63\u786E\u7B54\u6848')>=0 || ln.indexOf('\u5168\u7AD9\u6B63\u786E\u7387')>=0) {
-      var hasUser = ln.indexOf('\u4F60\u7684\u7B54\u6848')>=0;
-      for (var di=li-1; di<=li+1; di++) {
-        if (di<0||di>=lines.length||di===li) continue;
-        var dl = lines[di];
-        if (hasUser) { var mA=dl.match(/([A-Da-d])\s+([A-Da-d])\s+\d{1,3}\s*[%xX\u6BD4]/i); if(mA){result.correct=mA[1].toUpperCase();result.user=mA[2].toUpperCase();break;} }
-        else { var mB=dl.match(/([A-Da-d])\s+\d{1,3}\s*[%xX\u6BD4]/i); if(mB){result.correct=mB[1].toUpperCase();result.user=mB[1].toUpperCase();break;} }
+  for (var li = lines.length - 1; li >= Math.max(0, lines.length - 25); li--) {
+    var ln = (lines[li] || '').replace(/\s+/g, '');
+    var isHeader = ln.indexOf('正确答案') >= 0 || ln.indexOf('全站正确率') >= 0;
+    if (!isHeader) continue;
+    var hasUser = ln.indexOf('你的答案') >= 0;
+    for (var di = li - 1; di <= li + 1; di++) {
+      if (di < 0 || di >= lines.length || di === li) continue;
+      var dl = lines[di] || '';
+      if (hasUser) {
+        // 做错了：A D 55% ...
+        var mA = dl.match(/^\s*([A-Da-d])\s+([A-Da-d])\s+\d{1,3}\s*[%xX比]/i);
+        if (mA) { result.correct = mA[1].toUpperCase(); result.user = mA[2].toUpperCase(); break; }
+      } else {
+        // 做对了：B 87x ...
+        var mB = dl.match(/^\s*([A-Da-d])\s+\d{1,3}\s*[%xX比]/i);
+        if (mB) { result.correct = mB[1].toUpperCase(); result.user = mB[1].toUpperCase(); break; }
       }
-      if (result.correct) break;
     }
+    if (result.correct) break;
   }
-  if (!result.correct) { var cp=[/\u6B63\u786E\u7B54\u6848[\uFF1A:]\s*([A-D])/i,/\u3010\u7B54\u6848\u3011\s*([A-D])/i,/\u7B54\u6848[\uFF1A:]\s*([A-D])/i]; for(var i=0;i<cp.length;i++){var m=text.match(cp[i]);if(m){result.correct=m[1].toUpperCase();break;}} }
-  if (!result.user) { var up=[/\u6211\u7684\u7B54\u6848[\uFF1A:]\s*([A-D])/i,/\u4F60\u7684\u7B54\u6848[\uFF1A:]\s*([A-D])/i,/\u9009\u62E9[\uFF1A:]\s*([A-D])/i,/\u4F5C\u7B54[\uFF1A:]\s*([A-D])/i]; for(var j=0;j<up.length;j++){var m=text.match(up[j]);if(m){result.user=m[1].toUpperCase();break;}} }
+  if (!result.correct) {
+    var cp = [/正确答案[：:]\s*([A-D])/i, /【答案】\s*([A-D])/i, /答案[：:]\s*([A-D])/i, /参考答案[：:]\s*([A-D])/i];
+    for (var i = 0; i < cp.length; i++) { var m = text.match(cp[i]); if (m) { result.correct = m[1].toUpperCase(); break; } }
+  }
+  if (!result.user) {
+    var up = [/我的答案[：:]\s*([A-D])/i, /你的答案[：:]\s*([A-D])/i, /选择[：:]\s*([A-D])/i, /作答[：:]\s*([A-D])/i, /我选[：:]\s*([A-D])/i];
+    for (var j = 0; j < up.length; j++) { var m2 = text.match(up[j]); if (m2) { result.user = m2[1].toUpperCase(); break; } }
+  }
   return result;
 }
+function normalizeQuestionText(text) {
+  if (!text) return text;
+  text = text.replace(/([A-Da-d])\s*[.．、:：)]\s*/g, function(m) { return '\n' + m.trim() + ' '; });
+  text = text.replace(/\^\n+/, '');
+  return text;
+}
+
 function autoFillAnswers(text) {
   var a=parseAnswersFromText(text);
   if(a.user)document.querySelectorAll('input[name="userAnswer"]').forEach(function(r){if(r.value===a.user)r.checked=true;});
