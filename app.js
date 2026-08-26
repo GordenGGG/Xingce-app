@@ -17,11 +17,21 @@ async function callDS(system,user,temp){temp=temp||0.4;
 }
 
 // ===== Qwen-VL OCR =====
+
+// 从「标签:值」逐列转述确定性提取答案（决策全在代码，不靠模型判断）
+function extractStat(s){
+  s=(s||'').replace(/\s+/g,' ');
+  var correct='',user='',hasUser=false;
+  var m=s.match(/正确答案\s*[:：]\s*([A-Da-d])/i); if(m) correct=m[1].toUpperCase();
+  if(/你的答案\s*[:：]/i.test(s)){ hasUser=true; var mu=s.match(/你的答案\s*[:：]\s*([A-Da-d])/i); if(mu) user=mu[1].toUpperCase(); }
+  if(!hasUser) user=correct;
+  return {correct:correct,user:user};
+}
 async function callQwenVL(imageData){
-  var r=await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk(DK_KEY)},body:JSON.stringify({model:'qwen-vl-plus',messages:[{role:'user',content:[{type:'image_url',image_url:{url:imageData}},{type:'text',text:'请仔细阅读这张行测题目截图（公务员考试行测真题），精确提取信息并以JSON返回：\n\n【格式规则】\n- 分数统一写成 a/b 形式（如 14/25）\n- 百分号保持原样\n- 选项必须分行排列，每个选项独占一行：A. 选项内容、B. 选项内容、C. 选项内容、D. 选项内容\n\n【答案提取 - 最重要】\n截图底部统计表表头通常是「正确答案 你的答案 全站正确率 答题用时 易错项」。\n1. 有「你的答案」列（做错了）：第一列是正确答案，第二列是你的答案。如「A D 55% 31B D」→ correctAnswer=A，userAnswer=D\n2. 无「你的答案」列（做对了）：userAnswer 必须等于 correctAnswer。如「B 87x 1920 比 A」→ correctAnswer=B，userAnswer=B\n3. 百分号可能被识别成 x/X，时间可能识别成奇怪数字，只专注提取答案字母\n4. 答案只能是 A/B/C/D\n\n【JSON格式】\n{\n  \"question\": \"题目完整原文（含选项，保持排版）\",\n  \"correctAnswer\": \"A/B/C/D\",\n  \"userAnswer\": \"A/B/C/D 或空字符串\"\n}\n\n只返回JSON本身，不要Markdown包裹。'}]}],max_tokens:2000,temperature:0.1})});
+  var r=await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk(DK_KEY)},body:JSON.stringify({model:'qwen-vl-plus',messages:[{role:'user',content:[{type:'image_url',image_url:{url:imageData}},{type:'text',text:'请仔细阅读这张行测题目截图（公务员考试行测真题），精确提取信息并以JSON返回：\n\n【格式规则】\n- 分数统一写成 a/b 形式（如 14/25）\n- 百分号保持原样\n- 选项必须分行排列，每个选项独占一行：A. 选项内容、B. 选项内容、C. 选项内容、D. 选项内容\n\n【统计表转述 - 只抄写，不判断】\n截图底部通常有统计表（卡片式，每格上方是标签、下方是值）。请把它【原样逐列转述】，每个卡片单独一行，格式「标签: 值」，不要判断哪个是正确答案：\n正确答案: A\n你的答案: D\n全站正确率: 19%\n答题用时: 7秒\n易错项: C\n⚠️ 有哪个卡片就抄哪一行；若做对（无「你的答案」卡片）就少一行「你的答案」。一个都不能漏，尤其第二列「你的答案」卡片若存在务必抄出。值照抄（字母/百分比/时间，D/A、C/G 形近请仔细分辨）；看不清写「看不清」\n\n【JSON格式】\n{\n  "question": "题目完整原文（含选项，保持排版）",\n  "statTable": "正确答案: A  你的答案: D  全站正确率: 19%  答题用时: 7秒  易错项: C"\n}不要Markdown包裹。'}]}],max_tokens:2000,temperature:0.1})});
   if(!r.ok){var e=await r.text();if(r.status===401)throw new Error('DashScope Key 无效');throw new Error(e)}
   var d=await r.json();var c=d.choices[0].message.content;
-  try{var cl=c.replace(/^```json\s*/i,'').replace(/```\s*$/i,'');var p=JSON.parse(cl);return{question:p.question||c,correctAnswer:(p.correctAnswer||'').toUpperCase(),userAnswer:(p.userAnswer||'').toUpperCase()}}
+  try{var cl=c.replace(/^```json\s*/i,'').replace(/```\s*$/i,'');var p=JSON.parse(cl);return{question:p.question||c,correctAnswer:ex.correct,userAnswer:ex.user}}
   catch(e){return{question:c,correctAnswer:'',userAnswer:''}}
 }
 
@@ -137,7 +147,7 @@ ab.addEventListener('click',function(){
     return callDS('你是专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。',p,0.4)
   }).then(function(r){lastAnalysis={module:'',rawMarkdown:r,knowledgePoints:[]};renderAnalysis(r);rph.style.display='none';ar.style.display='block';resetChat();toast('解析完成','success')}).catch(function(e){rph.innerHTML='<span class="result-icon">\u274C</span><p>'+e.message+'</p>';toast(e.message,'error')}).finally(function(){ab.disabled=false;ab.textContent='\u{1F916} DeepSeek智能解析'})
 });
-function renderAnalysis(r){document.getElementById('resultFullAnalysis').innerHTML=marked.parse(r);try{if(typeof renderMathInElement!=='undefined')renderMathInElement(rfa,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}}
+function renderAnalysis(r){var c=r.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g,'').trim();document.getElementById('resultFullAnalysis').innerHTML=marked.parse(c);try{if(typeof renderMathInElement!=='undefined')renderMathInElement(rfa,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}}
 
 // ===== Voice =====
 var mr=null,ac=[],ms=null,cmb=null,sov='';
