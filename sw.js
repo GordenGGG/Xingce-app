@@ -1,8 +1,8 @@
 
-const CACHE = 'xingce-v2';
+const CACHE = 'xingce-v3';
 self.addEventListener('install', function(e) {
   e.waitUntil(caches.open(CACHE).then(function(c) {
-    return c.addAll(['/','/index.html','/app.js','/style.css','/prompts.js','/manifest.json']);
+    return c.addAll(['/','/index.html','/app.js','/style.css','/prompts.js','/storage.js','/manifest.json']);
   }));
 });
 self.addEventListener('fetch', function(e) {

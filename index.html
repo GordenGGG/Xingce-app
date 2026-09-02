@@ -81,12 +81,28 @@
             <textarea id="ocrText" rows="6"></textarea>
           </div>
           <div id="thoughtSection" class="thought-section" style="display:none">
-            <h3>🎯 你选的答案 <small>（自动识别）</small> <span id="detectedCorrectAnswer" style="color:#10b981;font-size:0.85rem"></span></h3>
-            <div class="answer-options">
-              <label class="answer-opt"><input type="radio" name="userAnswer" value="A"> A</label>
-              <label class="answer-opt"><input type="radio" name="userAnswer" value="B"> B</label>
-              <label class="answer-opt"><input type="radio" name="userAnswer" value="C"> C</label>
-              <label class="answer-opt"><input type="radio" name="userAnswer" value="D"> D</label>
+            <div class="thought-row">
+              <div class="thought-answer">
+                <h3>✅ 正确答案 <small>（AI自动识别，识别错请手动修正）</small> <span id="detectedCorrectAnswer" style="color:#10b981;font-size:0.85rem"></span></h3>
+                <div class="answer-options">
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="A"> A</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="B"> B</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="C"> C</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="D"> D</label>
+                  <label class="answer-opt"><input type="radio" name="correctAnswer" value="" checked> 🤔 未知</label>
+                </div>
+              </div>
+            </div>
+            <div class="thought-row">
+              <div class="thought-answer">
+                <h3>🎯 你选的答案 <small>（OCR自动识别，可手动修改）</small></h3>
+                <div class="answer-options">
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="A"> A</label>
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="B"> B</label>
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="C"> C</label>
+                  <label class="answer-opt"><input type="radio" name="userAnswer" value="D"> D</label>
+                </div>
+              </div>
             </div>
             <h3>🧠 思考过程 <small>（帮助AI诊断错因）</small></h3>
             <textarea id="userThought" rows="3" placeholder="写下当时的做题思路..."></textarea>
@@ -99,18 +115,28 @@
           <div id="analysisResult" class="analysis-result" style="display:none">
             <div class="result-header">
               <span class="module-badge" id="resultModule"></span>
+              <span class="category-badge" id="resultCategory"></span>
               <span class="difficulty-badge" id="resultDifficulty"></span>
             </div>
+            <div id="answerCompare" class="answer-compare" style="display:none"></div>
             <div id="resultFullAnalysis" class="solution-text markdown-body"></div>
             <div class="result-section"><h3>📚 知识点</h3><div id="resultKnowledge" class="knowledge-tags"></div></div>
             <div class="result-actions">
+              <label class="correct-toggle"><input type="checkbox" id="correctCheck"> 这道题我做对了</label>
               <button id="screenshotBtn" class="btn btn-capture">📸 截图分享</button>
-              <button id="saveBtn" class="btn btn-success">💾 保存</button>
+              <button id="saveBtn" class="btn btn-success">💾 保存到错题本</button>
             </div>
             <div class="chat-panel" id="chatPanel">
-              <div class="chat-header" id="chatToggle"><h3>💬 追问 & 复盘</h3><span>▼</span></div>
+              <div class="chat-header" id="chatToggle">
+                <h3>💬 追问 & 复盘</h3>
+                <div class="chat-header-right">
+                  <button id="chatExpandBtn" class="chat-expand-btn" title="整页专注/收起">⤢</button>
+                  <span>▼</span>
+                </div>
+              </div>
               <div class="chat-body">
                 <div class="chat-messages" id="chatMessages"><div class="chat-hint">💡 追问: "<strong>B选项为什么错</strong>？"</div></div>
+                <div class="summary-actions"><button id="summaryBtn" class="btn btn-small">📝 生成复盘小结</button></div>
                 <div class="chat-input-row">
                   <button class="mic-btn mic-btn-sm" data-target="chatInput" title="语音">🎤</button>
                   <textarea id="chatInput" rows="2" placeholder="输入问题或思路…" class="chat-textarea"></textarea>
@@ -123,11 +149,25 @@
       </div>
     </main>
     <main id="tab-review" class="tab-content">
+      <div class="review-toolbar">
+        <div class="filter-group">
+          <select id="filterCategory"><option value="all">全部类型</option><option value="政治理论">政治理论</option><option value="常识判断">常识判断</option><option value="言语理解">言语理解</option><option value="数量关系">数量关系</option><option value="判断推理">判断推理</option><option value="资料分析">资料分析</option></select>
+          <select id="filterDifficulty"><option value="all">全部难度</option><option value="简单">简单</option><option value="中等">中等</option><option value="困难">困难</option></select>
+          <select id="filterCorrect"><option value="all">全部对错</option><option value="correct">做对了</option><option value="wrong">做错了</option></select>
+          <select id="filterMastered"><option value="all">掌握状态</option><option value="no">未掌握</option><option value="yes">已掌握</option></select>
+          <input type="date" id="filterDateStart" title="开始日期">
+          <span>至</span>
+          <input type="date" id="filterDateEnd" title="结束日期">
+          <input type="text" id="filterKeyword" class="form-input" style="width:180px" placeholder="🔍 搜索题目/解析/知识点">
+        </div>
+      </div>
       <div id="reviewList" class="review-list"><div class="empty-state"><span>📭</span><p>还没有保存的题目记录</p></div></div>
+      <div id="pagination" class="pagination"></div>
     </main>
   </div>
   <div id="toast" class="toast"></div>
   <script src="prompts.js"></script>
+  <script src="storage.js"></script>
   <script src="app.js"></script>
   <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script>
 </body>

@@ -28,10 +28,10 @@ function extractStat(s){
   return {correct:correct,user:user};
 }
 async function callQwenVL(imageData){
-  var r=await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk(DK_KEY)},body:JSON.stringify({model:'qwen-vl-plus',messages:[{role:'user',content:[{type:'image_url',image_url:{url:imageData}},{type:'text',text:'请仔细阅读这张行测题目截图（公务员考试行测真题），精确提取信息并以JSON返回：\n\n【格式规则】\n- 分数统一写成 a/b 形式（如 14/25）\n- 百分号保持原样\n- 选项必须分行排列，每个选项独占一行：A. 选项内容、B. 选项内容、C. 选项内容、D. 选项内容\n\n【统计表转述 - 只抄写，不判断】\n截图底部通常有统计表（卡片式，每格上方是标签、下方是值）。请把它【原样逐列转述】，每个卡片单独一行，格式「标签: 值」，不要判断哪个是正确答案：\n正确答案: A\n你的答案: D\n全站正确率: 19%\n答题用时: 7秒\n易错项: C\n⚠️ 有哪个卡片就抄哪一行；若做对（无「你的答案」卡片）就少一行「你的答案」。一个都不能漏，尤其第二列「你的答案」卡片若存在务必抄出。值照抄（字母/百分比/时间，D/A、C/G 形近请仔细分辨）；看不清写「看不清」\n\n【JSON格式】\n{\n  "question": "题目完整原文（含选项，保持排版）",\n  "statTable": "正确答案: A  你的答案: D  全站正确率: 19%  答题用时: 7秒  易错项: C"\n}不要Markdown包裹。'}]}],max_tokens:2000,temperature:0.1})});
-  if(!r.ok){var e=await r.text();if(r.status===401)throw new Error('DashScope Key 无效');throw new Error(e)}
+  var r=await fetch('https://api.deepseek.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk(DS_KEY)},body:JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages:[{role:'user',content:[{type:'image_url',image_url:{url:imageData}},{type:'text',text:'请仔细阅读这张行测题目截图（公务员考试行测真题），精确提取信息并以JSON返回：\n\n【格式规则】\n- 分数统一写成 a/b 形式（如 14/25）\n- 百分号保持原样\n- 选项必须分行排列，每个选项独占一行：A. 选项内容、B. 选项内容、C. 选项内容、D. 选项内容\n\n【统计表转述 - 只抄写，不判断】\n截图底部通常有统计表（卡片式，每格上方是标签、下方是值）。请把它【原样逐列转述】，每个卡片单独一行，格式「标签: 值」，不要判断哪个是正确答案：\n正确答案: A\n你的答案: D\n全站正确率: 19%\n答题用时: 7秒\n易错项: C\n⚠️ 有哪个卡片就抄哪一行；若做对（无「你的答案」卡片）就少一行「你的答案」。一个都不能漏，尤其第二列「你的答案」卡片若存在务必抄出。值照抄（字母/百分比/时间，D/A、C/G 形近请仔细分辨）；看不清写「看不清」；「你的答案」与「易错项」是两列，即使值相同（如都是A）也要各抄一行，不可合并\n\n【JSON格式】\n{\n  "question": "题目完整原文（含选项，保持排版）",\n  "statTable": "正确答案: A  你的答案: D  全站正确率: 19%  答题用时: 7秒  易错项: C"\n}不要Markdown包裹。'}]}],max_tokens:2000,temperature:0.1})});
+  if(!r.ok){var e=await r.text();if(r.status===401)throw new Error('DeepSeek Key 无效');throw new Error(e)}
   var d=await r.json();var c=d.choices[0].message.content;
-  try{var cl=c.replace(/^```json\s*/i,'').replace(/```\s*$/i,'');var p=JSON.parse(cl);return{question:p.question||c,correctAnswer:ex.correct,userAnswer:ex.user}}
+  try{var cl=c.replace(/^```json\s*/i,'').replace(/```\s*$/i,'');var p=JSON.parse(cl);var ex=extractStat(p.statTable);return{question:p.question||c,correctAnswer:ex.correct,userAnswer:ex.user}}
   catch(e){return{question:c,correctAnswer:'',userAnswer:''}}
 }
 
@@ -105,7 +105,7 @@ function normalizeQuestionText(text) {
 }
 
 // ===== Tabs =====
-document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});document.querySelectorAll('.tab-content').forEach(function(x){x.classList.remove('active')});t.classList.add('active');var tg=document.getElementById('tab-'+t.dataset.tab);if(tg)tg.classList.add('active')})});
+document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});document.querySelectorAll('.tab-content').forEach(function(x){x.classList.remove('active')});t.classList.add('active');var tg=document.getElementById('tab-'+t.dataset.tab);if(tg)tg.classList.add('active');if(t.dataset.tab==='review')renderReviewList()})});
 
 // ===== DOM refs =====
 var uz=document.getElementById('uploadZone'),ii=document.getElementById('imageInput'),pi=document.getElementById('previewImage'),up=uz.querySelector('.upload-placeholder');
@@ -129,6 +129,7 @@ ob.addEventListener('click',function(){
     pf.style.width='100%';os.textContent='完成';
     setTimeout(function(){op.style.display='none';ore.style.display='block';ot.value=d.question||'';
       var ca=document.getElementById('detectedCorrectAnswer');if(d.correctAnswer&&ca)ca.textContent='(正确答案:'+d.correctAnswer+')';
+      if(d.correctAnswer){document.querySelectorAll('input[name="correctAnswer"]').forEach(function(r){if(r.value===d.correctAnswer)r.checked=true});}
       if(d.userAnswer)document.querySelectorAll('input[name="userAnswer"]').forEach(function(r){if(r.value===d.userAnswer)r.checked=true});
       ts.style.display='block';ab.style.display='block';if(ot.value)ab.click();ob.disabled=false;toast(ot.value?'识别完成':'未识别到文字',ot.value?'success':'error')},300)
   }).catch(function(e){op.style.display='none';ob.disabled=false;toast(e.message,'error')})
@@ -145,9 +146,32 @@ ab.addEventListener('click',function(){
     var p=MODULE_PROMPTS[m];p=p.replace('{{text}}',t);p=p.replace('{{userThought}}',utt||'（未提供）');
     p=p.replace('{{userAnswer}}',ua?ua.value:'（未提供）');p=p.replace('{{correctAnswer}}',dc||'（未识别）');
     return callDS('你是专业的行测辅导老师，严格按SOP格式输出解析，对每个选项进行全要素无死角过筛。',p,0.4)
-  }).then(function(r){lastAnalysis={module:'',rawMarkdown:r,knowledgePoints:[]};renderAnalysis(r);rph.style.display='none';ar.style.display='block';resetChat();toast('解析完成','success')}).catch(function(e){rph.innerHTML='<span class="result-icon">\u274C</span><p>'+e.message+'</p>';toast(e.message,'error')}).finally(function(){ab.disabled=false;ab.textContent='\u{1F916} DeepSeek智能解析'})
+  }).then(function(r){lastAnalysis={module:(document.getElementById('resultModule').textContent||''),rawMarkdown:r,knowledgePoints:Array.from(document.querySelectorAll('#resultKnowledge .knowledge-tag')).map(function(e){return e.textContent})};renderAnalysis(r);rph.style.display='none';ar.style.display='block';resetChat();toast('解析完成','success')}).catch(function(e){rph.innerHTML='<span class="result-icon">\u274C</span><p>'+e.message+'</p>';toast(e.message,'error')}).finally(function(){ab.disabled=false;ab.textContent='\u{1F916} DeepSeek智能解析'})
 });
-function renderAnalysis(r){var c=r.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g,'').trim();document.getElementById('resultFullAnalysis').innerHTML=marked.parse(c);try{if(typeof renderMathInElement!=='undefined')renderMathInElement(rfa,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}}
+function renderAnalysis(r){
+  var c=r.replace(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>\s*/g,'').trim();
+  // 从解析文本里尝试提取模块/难度/知识点标签（SOP 通常含【模块】【难度】【知识点】）
+  function pick(re){var m=r.match(re);return m?m[1].trim():''}
+  var mod=pick(/【\s*模块\s*】\s*[：:]\s*(.{1,20})/);
+  var diff=pick(/【\s*难度\s*】\s*[：:]\s*(.{1,10})/);
+  var kps=(r.match(/(?:知识点|考点|涉及知识点)\s*[：:]?\s*([^\n]+)/i)||[])[1]||'';
+  var modEl=document.getElementById('resultModule');if(modEl&&mod)modEl.textContent=mod;
+  var catEl=document.getElementById('resultCategory');if(catEl&&mod)catEl.textContent=mod;
+  var df=document.getElementById('resultDifficulty');
+  if(df&&diff){df.textContent=diff;df.className='difficulty-badge '+(diff==='困难'?'hard':diff==='简单'?'easy':'medium');}
+  // 答案对比卡
+  var cA=document.querySelector('input[name="correctAnswer"]:checked'),uA=document.querySelector('input[name="userAnswer"]:checked');
+  var cV=cA?cA.value:'',uV=uA?uA.value:'';
+  var ac=document.getElementById('answerCompare');
+  if(cV||uV){var acHtml='<span class="ac-correct">✅ 正确答案：'+(cV||'未知')+'</span>';
+    if(uV)acHtml+='<span class="ac-user '+(cV===uV?'right':'wrong')+'">我的答案：'+uV+(cV&&cV===uV?' ✓':' ✗')+'</span>';
+    ac.innerHTML=acHtml;ac.style.display='flex';}else{ac.style.display='none';}
+  document.getElementById('resultFullAnalysis').innerHTML=marked.parse(c);
+  try{if(typeof renderMathInElement!=='undefined')renderMathInElement(rfa,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}
+  var kd=document.getElementById('resultKnowledge');
+  if(kps){kd.innerHTML=kps.split(/[,，、;；\s]+/).filter(Boolean).slice(0,8).map(function(k){return'<span class="knowledge-tag">'+esc(k)+'</span>'}).join('');}
+  var cc=document.getElementById('correctCheck');if(cc)cc.checked=!!(cV&&uV&&cV===uV);
+}
 
 // ===== Voice =====
 var mr=null,ac=[],ms=null,cmb=null,sov='';
@@ -162,13 +186,102 @@ function df(c){var a=document.createElement('a');a.download='行测解析.png';a
 // ===== Chat =====
 var ct=document.getElementById('chatToggle'),cp=document.getElementById('chatPanel'),cm=document.getElementById('chatMessages'),ci=document.getElementById('chatInput'),csb=document.getElementById('chatSendBtn'),ch=[],icl=false;
 ct.addEventListener('click',function(){cp.classList.toggle('collapsed')});
+// 追问&复盘 专注模式（整页展开 / 收起）
+var ceb=document.getElementById('chatExpandBtn');
+function setChatFocus(on){cp.classList.toggle('focus',on);document.body.classList.toggle('chat-focus',on);if(ceb)ceb.title=on?'收起':'整页专注';if(on)cp.classList.remove('collapsed');else cp.classList.add('collapsed');requestAnimationFrame(function(){cm.scrollTop=cm.scrollHeight})}
+if(ceb)ceb.addEventListener('click',function(e){e.stopPropagation();setChatFocus(!cp.classList.contains('focus'))});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&cp.classList.contains('focus'))setChatFocus(false)});
 function resetChat(){ch=[];cm.innerHTML='<div class="chat-hint">\u{1F4A1} 追问: "<strong>B选项为什么错</strong>？"</div>'}
 function addCM(role,content){var h=cm.querySelector('.chat-hint');if(h)h.remove();var d=document.createElement('div');d.className='chat-message '+role;d.innerHTML=role==='assistant'?marked.parse(content):esc(content);if(role==='assistant')try{if(typeof renderMathInElement!=='undefined')renderMathInElement(d,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}var t=document.createElement('div');t.className='chat-message-time';t.textContent=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});d.appendChild(t);cm.appendChild(d);cm.scrollTop=cm.scrollHeight;ch.push({role:role,content:content})}
-function sendChat(){var m=ci.value.trim();if(!m||icl)return;if(!lastAnalysis){toast('请先解析题目','error');return}if(!hasDS()){toast('请配置Key','error');openSettings();return}icl=true;csb.disabled=true;ci.value='';addCM('user',m);var ty=document.createElement('div');ty.className='chat-typing';ty.textContent='AI思考中...';cm.appendChild(ty);
-  var sys='你是耐心的行测辅导老师。题目原文：'+ot.value+'。完整解析：'+(lastAnalysis.rawMarkdown||'')+'。请根据学生追问给出针对性解答。';
-  callDS(sys,ch.slice(0,-1).map(function(h){return h.role==='user'?'学生: '+h.content:'解析: '+h.content}).join('\n')+'\n\n学生追问: '+m,0.5).then(function(r){var t=document.querySelector('.chat-typing');if(t)t.remove();addCM('assistant',r)}).catch(function(e){var t=document.querySelector('.chat-typing');if(t)t.remove();addCM('assistant','抱歉: '+e.message)}).finally(function(){icl=false;csb.disabled=false;ci.focus()})
+// 组装结构化信息（正确答案/我的答案/对错）
+function chatContext(){var cA=document.querySelector('input[name="correctAnswer"]:checked'),uA=document.querySelector('input[name="userAnswer"]:checked');var cV=cA?cA.value:'',uV=uA?uA.value:'';var right=(uV&&cV)?(uV===cV):null;return{diff:cV,user:uV,right:right,kps:(lastAnalysis.knowledgePoints||[])}}
+function sendChat(mode){var m=(mode==='summary')?'请生成复盘小结':ci.value.trim();if(!m||icl)return;if(!lastAnalysis){toast('请先解析题目','error');return}if(!hasDS()){toast('请配置Key','error');openSettings();return}icl=true;csb.disabled=true;if(mode!=='summary')ci.value='';addCM('user',m);var ty=document.createElement('div');ty.className='chat-typing';ty.textContent='AI思考中...';cm.appendChild(ty);
+  var cx=chatContext();
+  var sys='你是耐心的行测辅导老师。题目原文：'+ot.value+'。完整解析：'+(lastAnalysis.rawMarkdown||'')+'。'+(mode==='summary'?'请结合这次练习给出3-5条简洁的复盘小结（易错点/提醒/下一步），用要点列表。':'请根据学生追问给出针对性解答。');
+  var user=ch.slice(0,-1).map(function(h){return h.role==='user'?'学生: '+h.content:'解析: '+h.content}).join('\n')+'\n\n[正确答案：'+(cx.diff||'未知')+'] [我的答案：'+(cx.user||'未选')+'] ['+(cx.right===null?'未判定':(cx.right?'做对了':'做错了'))+'] [知识点：'+(cx.kps.join('、')||'无')+']\n\n'+(mode==='summary'?'':'学生追问: ')+m;
+  callDS(sys,user,0.5).then(function(r){var t=document.querySelector('.chat-typing');if(t)t.remove();addCM('assistant',r);if(currentRecordId){storage.addConversation(currentRecordId,{role:'assistant',content:r,time:new Date().toISOString()})}}).catch(function(e){var t=document.querySelector('.chat-typing');if(t)t.remove();addCM('assistant','抱歉: '+e.message)}).finally(function(){icl=false;csb.disabled=false;ci.focus()})
 }
-csb.addEventListener('click',sendChat);ci.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}});
+csb.addEventListener('click',function(){sendChat()});ci.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}});
+var sbBtn=document.getElementById('summaryBtn');if(sbBtn)sbBtn.addEventListener('click',function(){sendChat('summary')});
+
+// ===== 保存到错题本（IndexedDB） =====
+var currentRecordId=null;
+var saveBtn=document.getElementById('saveBtn');
+function saveCurrent(){
+  if(!lastAnalysis){toast('请先解析题目','error');return}
+  var cA=document.querySelector('input[name="correctAnswer"]:checked'),uA=document.querySelector('input[name="userAnswer"]:checked');
+  var cV=cA?cA.value:'',uV=uA?uA.value:'';
+  var autoCorrect=(uV&&cV)?(uV===cV):false;
+  var isCorrect=document.getElementById('correctCheck').checked||autoCorrect;
+  var record={question:ot.value.trim(),solution:lastAnalysis.rawMarkdown||'',answer:cV,category:document.getElementById('resultCategory').textContent||lastAnalysis.module||'',difficulty:(document.getElementById('resultDifficulty').textContent||'中等'),knowledgePoints:Array.from(document.querySelectorAll('#resultKnowledge .knowledge-tag')).map(function(e){return e.textContent}),tips:'',isCorrect:isCorrect,imageData:cid||'',rawMarkdown:lastAnalysis.rawMarkdown||'',userAnswer:uV,userThought:ut.value.trim(),conversations:[]};
+  if(currentRecordId){var upd={};for(var k in record){if(k!=='conversations')upd[k]=record[k];}return storage.update(currentRecordId,upd).then(function(){return currentRecordId;});}
+  return storage.save(record).then(function(id){currentRecordId=id;return id;});
+}
+if(saveBtn)saveBtn.addEventListener('click',function(){saveCurrent().then(function(){toast('✓ 已保存到错题本','success')}).catch(function(){toast('保存失败','error')})});
+function loadRecordConversations(id){storage.getById(id).then(function(r){if(!r)return;if(r.conversations&&r.conversations.length){r.conversations.forEach(function(msg){addCM(msg.role,msg.content)})}})}
+
+// ===== 错题本列表 =====
+var reviewSelected={};
+function getSelectedIds(){return Object.keys(reviewSelected).filter(function(k){return reviewSelected[k];});}
+var reviewPage=1,reviewPageSize=20;
+function renderReviewList(){
+  var f={category:document.getElementById('filterCategory').value,difficulty:document.getElementById('filterDifficulty').value,isCorrect:document.getElementById('filterCorrect').value,mastered:document.getElementById('filterMastered').value,dateStart:document.getElementById('filterDateStart').value,dateEnd:document.getElementById('filterDateEnd').value,keyword:document.getElementById('filterKeyword').value};
+  storage.getAll(f).then(function(data){
+    var c=document.getElementById('reviewList');
+    if(!data||data.length===0){var e=document.getElementById('reviewList');e.innerHTML='<div class="empty-state"><span>\u{1F4ED}</span><p>还没有保存的题目记录</p></div>';return}
+    var total=data.length,pages=Math.max(1,Math.ceil(total/reviewPageSize));
+    if(reviewPage>pages)reviewPage=pages;
+    var slice=data.slice((reviewPage-1)*reviewPageSize,reviewPage*reviewPageSize);
+    c.innerHTML=slice.map(function(r){
+      return'<div class="review-card'+(r.mastered?' mastered':'')+'" data-id="'+r.id+'">'
+        +'<div class="review-card-header">'
+        +'<span class="review-category">'+esc(r.category||'')+'</span>'
+        +'<span class="review-difficulty '+esc(r.difficulty||'')+'">'+esc(r.difficulty||'')+'</span>'
+        +'<span class="review-correct '+(r.isCorrect?'correct':'wrong')+'">'+(r.isCorrect?'✅ 做对了':'❌ 做错了')+'</span>'
+        +(r.mastered?'<span class="review-mastered">✅ 已掌握</span>':'')
+        +'<span class="review-date">'+new Date(r.createdAt).toLocaleDateString('zh-CN')+'</span>'
+        +'</div>'
+        +'<div class="review-card-body"><div class="review-question">'+esc(r.question||'')+'</div></div>'
+        +'<div class="review-card-actions">'
+        +'<button class="btn btn-small" onclick="viewReviewCard('+r.id+')">🔍 查看</button>'
+        +(r.mastered?'':'<button class="btn btn-small" onclick="markMastered('+r.id+')">✅ 掌握</button>')
+        +'<button class="btn btn-small btn-danger" onclick="deleteReviewCard('+r.id+')">🗑 删除</button>'
+        +'</div></div>'
+    }).join('');
+    var p=document.getElementById('pagination');
+    if(pages>1){var html='<button class="btn btn-small page-btn"'+(reviewPage<=1?' disabled':'')+' onclick="gotoPage('+(reviewPage-1)+')">上一页</button>';for(var i=1;i<=pages;i++){html+='<button class="btn btn-small page-btn'+(i===reviewPage?' active':'')+'" onclick="gotoPage('+i+')">'+i+'</button>'}html+='<button class="btn btn-small page-btn"'+(reviewPage>=pages?' disabled':'')+' onclick="gotoPage('+(reviewPage+1)+')">下一页</button>';html+='<span class="page-total">共 '+total+' 条，第 '+reviewPage+'/'+pages+' 页</span>';p.innerHTML=html}else{p.innerHTML=''}
+  });
+}
+window.gotoPage=function(pg){if(pg<1)return;reviewPage=pg;renderReviewList()};
+window.markMastered=function(id){storage.update(id,{mastered:true,masteredAt:new Date().toISOString()}).then(function(){renderReviewList();toast('已标记掌握','success')})};
+window.deleteReviewCard=function(id){if(!confirm('确认删除这条记录？'))return;storage.delete(id).then(function(){renderReviewList();toast('已删除')})};
+window.viewReviewCard=function(id){
+  storage.getById(id).then(function(r){if(!r)return;
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+    var tt=document.querySelector('.tab[data-tab="analyze"]');if(tt)tt.classList.add('active');document.getElementById('tab-analyze').classList.add('active');
+    if(r.imageData){cid=r.imageData;previewImage.src=r.imageData;previewImage.style.display='block';up.style.display='none';ob.disabled=false}
+    ot.value=r.question||'';ore.style.display='block';ts.style.display='block';ab.style.display='none';
+    document.querySelectorAll('input[name="correctAnswer"]').forEach(function(rb){rb.checked=(rb.value===(r.answer||''))});
+    document.querySelectorAll('input[name="userAnswer"]').forEach(function(rb){rb.checked=(rb.value===(r.userAnswer||''))});
+    var dca=document.getElementById('detectedCorrectAnswer');if(dca&&r.answer)dca.textContent='(正确答案:'+r.answer+')';
+    ut.value=r.userThought||'';
+    rph.style.display='none';ar.style.display='block';resetChat();loadRecordConversations(r.id);
+    var rf=document.getElementById('resultFullAnalysis');rf.innerHTML=marked.parse(r.rawMarkdown||r.solution||'');try{if(typeof renderMathInElement!=='undefined')renderMathInElement(rf,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}catch(e){}
+    var modEl=document.getElementById('resultModule');if(modEl&&r.category)modEl.textContent=r.category;
+    var catEl=document.getElementById('resultCategory');if(catEl&&r.category)catEl.textContent=r.category;
+    if(r.knowledgePoints){var kd=document.getElementById('resultKnowledge');kd.innerHTML=r.knowledgePoints.map(function(k){return'<span class="knowledge-tag">'+esc(k)+'</span>'}).join('')}
+    if(r.difficulty){var df=document.getElementById('resultDifficulty');df.textContent=r.difficulty;df.className='difficulty-badge '+(r.difficulty==='困难'?'hard':r.difficulty==='简单'?'easy':'medium')}
+    var cA=document.querySelector('input[name="correctAnswer"]:checked'),uA=document.querySelector('input[name="userAnswer"]:checked');var cV=cA?cA.value:'',uV=uA?uA.value:'';var ac=document.getElementById('answerCompare');
+    if(cV||uV){var acHtml='<span class="ac-correct">✅ 正确答案：'+(cV||'未知')+'</span>';if(uV)acHtml+='<span class="ac-user '+(cV===uV?'right':'wrong')+'">我的答案：'+uV+'</span>';ac.innerHTML=acHtml;ac.style.display='flex'}else{ac.style.display='none'}
+    lastAnalysis={module:r.category||'',rawMarkdown:r.rawMarkdown||r.solution||'',knowledgePoints:r.knowledgePoints||[]};currentRecordId=r.id;
+    toast('已载入错题本记录','success');
+  });
+};
+function bindReviewFilters(){
+  ['filterCategory','filterDifficulty','filterCorrect','filterMastered','filterDateStart','filterDateEnd'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('change',function(){reviewPage=1;renderReviewList()})});
+  var kw=document.getElementById('filterKeyword');if(kw)kw.addEventListener('input',function(){reviewPage=1;renderReviewList()});
+}
 
 // ===== Init =====
-if(!hasDS()&&!hasDK())setTimeout(function(){document.getElementById('settingsModal').style.display='flex'},500);
+bindReviewFilters();
+storage.init().then(function(){renderReviewList();if(!hasDS()&&!hasDK())setTimeout(function(){document.getElementById('settingsModal').style.display='flex'},500);}).catch(function(){toast('数据库初始化失败','error')});
