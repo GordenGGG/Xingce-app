@@ -1,23 +1,89 @@
-# 行测备考助手（PWA 部署目录）
+# 行测备考助手（PWA）
 
-> **本目录是 `pwa/` 的发布快照**，由 `pwa/` 同步而来，仅用于 GitHub Pages 等静态托管发布。
-> 日常开发请直接修改 `pwa/`（提示词改 `prompts/` 后运行 `node pwa/build.js` 重新打包），然后重新同步本目录。
+> **在线地址**：https://gordenggg.github.io/Xingce-app/
+> 纯前端 PWA · 无需服务器 · 数据保存在本机浏览器
 
-行测题目 OCR 识别 + DeepSeek 智能解析 + 错题复盘
+公务员考试**行测**备考助手：截图识别题目 → AI 深度解析 → 填写思考过程 → 逐句批改 + 能力评分 → 错题复盘。
 
-## 使用方式
+---
 
-1. 打开 [GitHub Pages 链接]
-2. 点击右上角 ⚙️ 设置 → 配置你的 API Key
-   - **DeepSeek API Key**：从 [platform.deepseek.com](https://platform.deepseek.com/api_keys) 获取
-   - **DashScope API Key**：从 [bailian.console.aliyun.com](https://bailian.console.aliyun.com) 获取
-3. 上传题目截图 → AI 自动解析
+## ✨ 功能特性
 
-## 安装到手机
+### 📷 题目识别
+- 上传 / 粘贴截图，自动识别题目原文、选项
+- 自动提取「正确答案」「你的答案」（识别错可手动修正）
+
+### 🤖 双解析模式（顶部一键切换）
+| 模式 | 特点 |
+|---|---|
+| **完整版** | 按模块 SOP 输出「题目原文 → 错因诊断 → 全要素解析」，逐选项过筛 |
+| **Lite 版** | 严师批改式：**逐句批改**你的思考过程，每句标注【对】/【错】/【对但理由偏】/【模糊·需理清】/【没说到点上】，并给出「正确的应该是什么」；结尾必给「🎯 这道题应该怎么解」完整解法 |
+
+### 🌐 联网核实
+- **政治理论 / 常识判断**题目解析时自动联网检索官方信息，避免凭旧知识出错（时效性强、有争议的知识点优先以检索结果为准）
+
+### 🧮 思考过程评分
+- 填了思考过程即自动打分（0-100）：**判断依据 30% / 辨析精度 20% / 结果正确 20% / 逻辑严密 15% / 知识准确 15%**
+- **蒙对识别**：答案对但说不出依据会被降档提醒，逼你从「蒙对」走向「真会」
+- 给出你的**优势 / 短板 / 下一步重点**
+
+### 📈 进步趋势
+- 每次评分自动记录，「📊 统计看板」里绘制**思考过程评分趋势曲线**，直观看到能力提升轨迹
+
+### 💬 追问 & 复盘
+- 针对解析继续追问，私教式启发解答；支持**专注模式**（整页展开）
+- 一键生成**复盘小结**，沉淀为规范学习要点
+
+### 📋 错题本 & 统计
+- 题目、解析、对错、知识点自动入库（IndexedDB 本地存储）
+- 支持按类型/难度/对错/掌握状态/日期/关键词筛选，含掌握标记、分页
+- 统计看板：题量、正确率、薄弱模块、模块分布、难度分布、薄弱知识点
+
+---
+
+## 🚀 使用方式
+
+1. 打开 https://gordenggg.github.io/Xingce-app/
+2. 点右上角 **⚙️ 设置**，填入 API Key：
+   - **DeepSeek API Key**（必需）：从 [platform.deepseek.com](https://platform.deepseek.com/api_keys) 获取
+   - **DashScope API Key**（可选，仅语音输入用）：从 [bailian.console.aliyun.com](https://bailian.console.aliyun.com) 获取
+3. **使用流程**：
+   - 上传 / 粘贴题目截图 → 点「🔎 开始识别文字」
+   - 核对「正确答案 / 你选的答案」，填写「🧠 思考过程」
+   - 点「🤖 开始解析」→ 查看批改 / 评分 / 解析
+   - 可继续「💬 追问」或「💾 保存到错题本」
+
+> 💡 **建议**：填的思考过程越详细（尤其是你犹豫、不确定、说不清为什么的地方），逐句批改和评分就越有价值。
+
+---
+
+## 📱 安装到手机
 
 - **Android**：用 [PWABuilder](https://pwabuilder.com) 输入本页 URL → 打包 APK
 - **iPhone**：Safari 打开 → 分享 → 添加到主屏幕
+- **桌面**：Chrome/Edge 地址栏右侧「安装」图标
 
-## 技术栈
+---
 
-纯前端 PWA，API 调用直连 DeepSeek + 阿里 DashScope，无后端服务器。
+## 🔧 技术栈
+
+- **纯前端 PWA**：HTML / CSS / 原生 JavaScript，无后端服务器
+- **API**：浏览器直连 DeepSeek 官方 API
+  - 图片识别：`deepseek-v4-flash-vision-exp`（视觉模型）
+  - 解析 / 追问 / 评分：`deepseek-chat`
+  - 联网核实：DeepSeek Responses API + `web_search` 工具
+- **本地存储**：IndexedDB（错题本 + 评分记录）、localStorage（API Key、模式偏好）
+- **离线**：Service Worker 缓存静态资源；API Key 与数据均存在本机，不上传第三方
+
+---
+
+## 📁 目录说明（开发）
+
+```
+deploy/          本目录：PWA 发布快照，同步到 GitHub Pages
+pwa/             PWA 源目录（app.js / index.html）
+prompts/         各模块解析提示词（改后运行 node pwa/build.js 打包）
+public/          本地服务器版（Node 后端 server.js）
+```
+
+**发布流程**：修改源文件 → `node pwa/build.js` → 同步到 `deploy/` → 提交推送（`更新到GitHub.bat` 或手动 push）。
