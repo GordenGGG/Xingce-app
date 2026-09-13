@@ -110,12 +110,71 @@ function extractStat(s){
   if(!hasUser) user=correct;
   return {correct:correct,user:user};
 }
+
+// 单次视觉识别调用
+async function callQwenVlRaw(imageData,promptText){
+  var r=await fetch('https://api.deepseek.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk(DS_KEY)},body:JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages:[{role:'user',content:[{type:'image_url',image_url:{url:imageData}},{type:'text',text:promptText}]}],max_tokens:2000,temperature:0.1})});
+  if(!r.ok){var e=await r.text();if(r.status===401)throw new Error('DeepSeek Key 无效');throw new Error('视觉识别调用失败: '+e)}
+  var d=await r.json();return (d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||'';
+}
+
+// 解析模型返回：优先 JSON，失败则正则兜底（避免偶发非规范 JSON 导致空结果）
+function parseStatJson(content){
+  var q=content,statTable='',directC='',directU='';
+  try{
+    var j=JSON.parse(content.replace(/^```json\s*/i,'').replace(/```\s*$/i,''));
+    q=j.question||content;statTable=j.statTable||'';
+    directC=(j.correctAnswer||'').toUpperCase();directU=(j.userAnswer||'').toUpperCase();
+  }catch(e){
+    q=content;
+    var mC=content.match(/正确答案\s*[:：]\s*([A-Da-d])/);
+    var mU=content.match(/你的答案\s*[:：]\s*([A-Da-d])/);
+    if(mC)statTable='正确答案: '+mC[1];
+    if(mU)statTable=(statTable?statTable+'\n':'')+'你的答案: '+mU[1];
+  }
+  return {q:q,statTable:statTable,directC:directC,directU:directU};
+}
+
+// OCR 提示词（与本地版完全一致）
+var OCR_FULL_PROMPT = `请仔细阅读这张行测题目截图（公务员考试行测真题），精确提取信息并以JSON返回。
+
+【格式规则 - 严格遵守】
+- 所有数字和符号原样输出，不要改变格式
+- 分数统一写成 a/b 形式（如 14/25，不要用 LaTeX）
+- 百分号保持原样（如 55%）
+- 数学公式中的数字直接写（如 2:3、x+3=5）
+- 标点符号保持原文（中文用中文标点，英文用英文标点）
+- 选项必须分行排列，每个选项独占一行，格式为 A. 选项内容、B. 选项内容、C. 选项内容、D. 选项内容
+
+【统计表转述 - 只抄写，不判断】
+截图底部通常有统计表（卡片式，每格上方是标签、下方是值）。请把它【原样逐列转述】，每个卡片单独一行，格式「标签: 值」，不要判断哪个是正确答案：
+正确答案: A
+你的答案: D
+全站正确率: 19%
+答题用时: 7秒
+易错项: C
+⚠️ 有哪个卡片就抄哪一行；若做对（无「你的答案」卡片）就少一行「你的答案」。一个都不能漏，尤其第二列「你的答案」卡片若存在务必抄出。值照抄（字母/百分比/时间，D/A、C/G 形近请仔细分辨）；看不清写「看不清」；「你的答案」与「易错项」是两列，即使值相同（如都是A）也要各抄一行，不可合并【JSON格式】
+{
+  "question": "题目完整原文（含选项，保持排版）",
+  "statTable": "正确答案: D  全站正确率: 33% 答题用时: 30秒  易错项: C"
+}
+
+只返回JSON本身，不要Markdown包裹。`;
+
+// 全图识别：DeepSeek vision 偶发空结果 → 自动重试最多 3 次（与本地版一致）
 async function callQwenVL(imageData){
-  var r=await fetch('https://api.deepseek.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk(DS_KEY)},body:JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages:[{role:'user',content:[{type:'image_url',image_url:{url:imageData}},{type:'text',text:'请仔细阅读这张行测题目截图（公务员考试行测真题），精确提取信息并以JSON返回：\n\n【格式规则】\n- 分数统一写成 a/b 形式（如 14/25）\n- 百分号保持原样\n- 选项必须分行排列，每个选项独占一行：A. 选项内容、B. 选项内容、C. 选项内容、D. 选项内容\n\n【统计表转述 - 只抄写，不判断】\n截图底部通常有统计表（卡片式，每格上方是标签、下方是值）。请把它【原样逐列转述】，每个卡片单独一行，格式「标签: 值」，不要判断哪个是正确答案：\n正确答案: A\n你的答案: D\n全站正确率: 19%\n答题用时: 7秒\n易错项: C\n⚠️ 有哪个卡片就抄哪一行；若做对（无「你的答案」卡片）就少一行「你的答案」。一个都不能漏，尤其第二列「你的答案」卡片若存在务必抄出。值照抄（字母/百分比/时间，D/A、C/G 形近请仔细分辨）；看不清写「看不清」；「你的答案」与「易错项」是两列，即使值相同（如都是A）也要各抄一行，不可合并\n\n【JSON格式】\n{\n  "question": "题目完整原文（含选项，保持排版）",\n  "statTable": "正确答案: A  你的答案: D  全站正确率: 19%  答题用时: 7秒  易错项: C"\n}不要Markdown包裹。'}]}],max_tokens:2000,temperature:0.1})});
-  if(!r.ok){var e=await r.text();if(r.status===401)throw new Error('DeepSeek Key 无效');throw new Error(e)}
-  var d=await r.json();var c=d.choices[0].message.content;
-  try{var cl=c.replace(/^```json\s*/i,'').replace(/```\s*$/i,'');var p=JSON.parse(cl);var ex=extractStat(p.statTable);return{question:p.question||c,correctAnswer:ex.correct,userAnswer:ex.user}}
-  catch(e){return{question:c,correctAnswer:'',userAnswer:''}}
+  var lastQ='',fullAns={correct:'',user:''},fullParsed={q:'',statTable:'',directC:'',directU:''};
+  for(var attempt=0;attempt<3;attempt++){
+    var content=await callQwenVlRaw(imageData,OCR_FULL_PROMPT);
+    fullParsed=parseStatJson(content);
+    lastQ=fullParsed.q||lastQ;
+    fullAns=extractStat(fullParsed.statTable);
+    if(fullAns.correct||fullParsed.directC)break; // 拿到答案即成功
+  }
+  var result={question:lastQ,correctAnswer:fullAns.correct||fullParsed.directC,userAnswer:fullAns.user||fullParsed.directU};
+  // 做对兜底：有正确答案但无我的答案时，视为做对
+  if(result.correctAnswer&&!result.userAnswer)result.userAnswer=result.correctAnswer;
+  return result;
 }
 
 // ===== SenseVoice ASR =====
