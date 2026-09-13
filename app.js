@@ -229,9 +229,9 @@ function hif(f){if(!f.type.startsWith('image/')){toast('请上传图片','error'
 
 // ===== OCR =====
 ob.addEventListener('click',function(){
-  if(!cid)return;if(!hasDK()){toast('请配置DashScope Key','error');openSettings();return}
+  if(!cid)return;if(!hasDS()){toast('请配置DeepSeek Key','error');openSettings();return}
   ob.disabled=true;op.style.display='block';ore.style.display='none';ts.style.display='none';ab.style.display='none';
-  pf.style.width='30%';os.textContent='Qwen-VL正在看图识别...';
+  pf.style.width='30%';os.textContent='DeepSeek 正在看图识别...';
   callQwenVL(cid).then(function(d){
     pf.style.width='100%';os.textContent='完成';
     setTimeout(function(){op.style.display='none';ore.style.display='block';ot.value=d.question||'';
