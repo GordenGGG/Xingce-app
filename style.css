@@ -70,6 +70,39 @@ body {
   transition: all 0.2s;
 }
 
+/* ===== 版本切换（完整版 / Lite版） ===== */
+.mode-switch {
+  display: inline-flex;
+  background: #eef2ff;
+  border-radius: 999px;
+  padding: 3px;
+  margin-right: 8px;
+}
+.mode-opt {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  padding: 5px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.mode-opt.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(79,70,229,0.3);
+}
+
+/* ===== Lite 版：隐藏语音相关控件 + 非对话式的知识点/陷阱板块 ===== */
+body.mode-lite .mic-btn,
+body.mode-lite #preloadVoiceBtn,
+body.mode-lite .thought-section .mic-btn { display: none !important; }
+body.mode-lite #resultTrap,
+body.mode-lite #analysisResult .result-section:not(#resultTrap) { display: none !important; }
+body.mode-lite #analysisResult .result-actions .correct-toggle { display: inline-flex; }
+
 .btn-icon:hover {
   background: #f1f5f9;
   border-color: var(--primary);
@@ -316,6 +349,17 @@ body {
   display: block;
   margin-top: 8px;
   font-size: 0.85rem;
+}
+
+/* 联网解析进度提示：呼吸闪烁，让用户知道仍在工作而非卡死 */
+.result-placeholder small#parseHint {
+  color: var(--primary);
+  font-weight: 500;
+  animation: parsePulse 1.6s ease-in-out infinite;
+}
+@keyframes parsePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 .analysis-result {
@@ -1191,6 +1235,18 @@ body.chat-focus { overflow: hidden; }
   border-radius: var(--radius-sm);
 }
 
+.thought-hint {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
 .thought-section h3 {
   color: #92400e;
   margin-bottom: 8px;
@@ -1529,3 +1585,88 @@ body.chat-focus { overflow: hidden; }
   color: var(--primary);
   font-size: 0.98rem;
 }
+
+/* ===== 网页截图按钮 ===== */
+.upload-panel .btn-secondary {
+  width: 100%;
+  margin-top: 12px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: var(--primary);
+}
+.upload-panel .btn-secondary:hover { background: #e0e7ff; }
+
+/* ===== 截图框选遮罩 ===== */
+.crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15,23,42,0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+}
+.crop-toolbar {
+  background: #fff;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.crop-toolbar span { font-weight: 500; }
+.crop-canvas {
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 120px);
+  background: #fff;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  cursor: crosshair;
+}
+@media (max-width: 768px) {
+  .crop-toolbar { flex-wrap: wrap; justify-content: center; }
+}
+
+/* ===== 思考过程评分卡 ===== */
+.score-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  background: #f8fafc;
+}
+.score-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.score-total { font-size: 2rem; font-weight: 700; line-height: 1; }
+.score-total small { font-size: 0.85rem; font-weight: 400; color: var(--text-secondary); margin-left: 2px; }
+.score-grade { font-size: 0.9rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; color:#fff; }
+.grade-ex { color: #059669; }
+.grade-good { color: #2563eb; }
+.grade-mid { color: #d97706; }
+.grade-low { color: #dc2626; }
+.score-total.grade-ex { color:#059669; }
+.score-total.grade-good { color:#2563eb; }
+.score-total.grade-mid { color:#d97706; }
+.score-total.grade-low { color:#dc2626; }
+.score-grade.grade-ex { background:#059669; }
+.score-grade.grade-good { background:#2563eb; }
+.score-grade.grade-mid { background:#d97706; }
+.score-grade.grade-low { background:#dc2626; }
+.score-body { display:flex; flex-direction:column; gap:6px; }
+.score-row { display:flex; align-items:center; gap:10px; }
+.score-label { width:64px; font-size:0.82rem; color:var(--text-secondary); flex-shrink:0; }
+.score-bar { flex:1; height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden; }
+.score-fill { display:block; height:100%; background:var(--primary); border-radius:999px; transition:width .4s; }
+.score-num { width:42px; text-align:right; font-size:0.82rem; color:var(--text); flex-shrink:0; }
+.score-montai { margin-top:10px; font-size:0.85rem; color:#b45309; background:#fef3c7; border:1px solid #fde68a; border-radius:var(--radius-sm); padding:8px 12px; }
+.score-detail { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }
+.score-col { flex:1; min-width:180px; }
+.score-col h4 { font-size:0.85rem; color:var(--primary); margin-bottom:6px; }
+.score-col ul { padding-left:18px; }
+.score-col li { font-size:0.85rem; line-height:1.6; margin:2px 0; }
+.score-foot { margin-top:12px; font-size:0.75rem; color:var(--text-secondary); border-top:1px dashed var(--border); padding-top:8px; }

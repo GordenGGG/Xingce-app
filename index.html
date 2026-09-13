@@ -24,11 +24,16 @@
     <header class="header">
       <div class="header-row">
         <h1>📝 行测备考助手 <span id="appVersion" class="version-badge">v2.0.0</span></h1>
+        <div class="mode-switch" id="modeSwitch" title="切换解析模式">
+          <button class="mode-opt active" data-mode="full">完整版</button>
+          <button class="mode-opt" data-mode="lite">Lite版</button>
+        </div>
         <button id="settingsBtn" class="btn-icon" title="设置">⚙️</button>
       </div>
       <nav class="tabs">
         <button class="tab active" data-tab="analyze">🔍 题目解析</button>
         <button class="tab" data-tab="review">📋 错题本</button>
+        <button class="tab" data-tab="stats">📊 统计看板</button>
       </nav>
     </header>
 
@@ -81,6 +86,7 @@
             <textarea id="ocrText" rows="6"></textarea>
           </div>
           <div id="thoughtSection" class="thought-section" style="display:none">
+            <div id="thoughtHint" class="thought-hint" style="display:none">✅ 识别完成！请先核对上方答案、填写「🧠 思考过程」，然后点「🤖 开始解析」</div>
             <div class="thought-row">
               <div class="thought-answer">
                 <h3>✅ 正确答案 <small>（AI自动识别，识别错请手动修正）</small> <span id="detectedCorrectAnswer" style="color:#10b981;font-size:0.85rem"></span></h3>
@@ -113,6 +119,8 @@
         <section class="panel result-panel" id="resultPanel">
           <div class="result-placeholder"><span class="result-icon">🤖</span><p>AI 解析结果将显示在这里</p></div>
           <div id="analysisResult" class="analysis-result" style="display:none">
+            <!-- 思考过程评分卡（Lite版带评分时显示） -->
+            <div id="scoreCard" class="score-card" style="display:none"></div>
             <div class="result-header">
               <span class="module-badge" id="resultModule"></span>
               <span class="category-badge" id="resultCategory"></span>
@@ -164,10 +172,32 @@
       <div id="reviewList" class="review-list"><div class="empty-state"><span>📭</span><p>还没有保存的题目记录</p></div></div>
       <div id="pagination" class="pagination"></div>
     </main>
+
+    <!-- 统计看板页面 -->
+    <main id="tab-stats" class="tab-content">
+      <div class="stats-grid">
+        <div class="stats-card"><h3>总题量</h3><p class="stats-number" id="statTotal">0</p></div>
+        <div class="stats-card correct"><h3>正确率</h3><p class="stats-number" id="statAccuracy">0%</p></div>
+        <div class="stats-card"><h3>薄弱模块</h3><p class="stats-number" id="statWeakness">-</p></div>
+        <div class="stats-card"><h3>近期趋势</h3><p class="stats-number" id="statTrend">-</p></div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-container"><h3>各模块题目分布</h3><canvas id="chartCategory"></canvas></div>
+        <div class="chart-container"><h3>各模块正确率</h3><canvas id="chartAccuracy"></canvas></div>
+        <div class="chart-container"><h3>难度分布</h3><canvas id="chartDifficulty"></canvas></div>
+        <div class="chart-container"><h3>近期做题趋势</h3><canvas id="chartTrend"></canvas></div>
+        <div class="chart-container"><h3>📈 思考过程评分趋势</h3><canvas id="chartScoreTrend"></canvas></div>
+      </div>
+      <div class="weakness-panel" id="weaknessPanel">
+        <h3>📉 薄弱知识点分析</h3>
+        <div id="weaknessContent"><p class="empty-state">暂无数据</p></div>
+      </div>
+    </main>
   </div>
   <div id="toast" class="toast"></div>
   <script src="prompts.js"></script>
   <script src="storage.js"></script>
+  <script src="stats.js"></script>
   <script src="app.js"></script>
   <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script>
 </body>

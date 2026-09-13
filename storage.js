@@ -1,7 +1,8 @@
 // ===== IndexedDB 存储模块 =====
 const DB_NAME = "XingCeApp";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = "questions";
+const SCORE_STORE = "scores";
 
 class Storage {
   constructor() {
@@ -22,6 +23,14 @@ class Storage {
           store.createIndex("category", "category", { unique: false });
           store.createIndex("difficulty", "difficulty", { unique: false });
           store.createIndex("isCorrect", "isCorrect", { unique: false });
+        }
+        // 思考过程评分记录存储
+        if (!db.objectStoreNames.contains(SCORE_STORE)) {
+          const ss = db.createObjectStore(SCORE_STORE, {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+          ss.createIndex("createdAt", "createdAt", { unique: false });
         }
       };
       request.onsuccess = (e) => {
@@ -297,6 +306,41 @@ class Storage {
       dailyData,
       weaknesses,
     };
+  }
+
+  // ===== 思考过程评分记录 =====
+  async saveScore(score) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(SCORE_STORE, "readwrite");
+      const store = tx.objectStore(SCORE_STORE);
+      const request = store.add({
+        total: score.total,
+        grade: score.grade,
+        basis: score.scores ? score.scores.basis : 0,
+        precision: score.scores ? score.scores.precision : 0,
+        correctness: score.scores ? score.scores.correctness : 0,
+        logic: score.scores ? score.scores.logic : 0,
+        knowledge: score.scores ? score.scores.knowledge : 0,
+        montai: !!score.montai,
+        createdAt: new Date().toISOString(),
+      });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getScores() {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(SCORE_STORE, "readonly");
+      const store = tx.objectStore(SCORE_STORE);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const rows = request.result || [];
+        rows.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        resolve(rows);
+      };
+      request.onerror = () => reject(request.error);
+    });
   }
 }
 
